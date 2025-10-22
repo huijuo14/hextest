@@ -91,61 +91,68 @@ class AdShareMonitor:
         return False
 
     def extract_profile(self):
-        """Extract with multiple fallback methods"""
-        logging.info("📦 Extracting Firefox profile...")
-        
-        # Method 1: Python tarfile
+        """Extract from double-compressed tar.gz"""
         try:
-            with tarfile.open(PROFILE_BACKUP, 'r:gz') as tar:
-                members = tar.getmembers()
-                logging.info(f"📁 Archive contains {len(members)} files")
-                tar.extractall(PROFILE_PATH)
-            logging.info("✅ Extraction successful with Python tarfile")
-        except Exception as e:
-            logging.error(f"❌ Python tarfile failed: {e}")
-            # Method 2: System tar command
-            try:
-                logging.info("🔄 Trying system tar command...")
-                result = os.system(f'tar -xzf "{PROFILE_BACKUP}" -C "{PROFILE_PATH}"')
-                if result == 0:
-                    logging.info("✅ Extraction successful with system tar")
-                else:
-                    raise Exception("System tar command failed")
-            except Exception as e2:
-                logging.error(f"❌ System tar failed: {e2}")
-                # Method 3: Force extraction ignoring errors
-                try:
-                    logging.info("🔄 Trying forced extraction...")
-                    result = os.system(f'tar -xzf "{PROFILE_BACKUP}" -C "{PROFILE_PATH}" --force-local')
-                    if result == 0:
-                        logging.info("✅ Extraction successful with force")
-                    else:
-                        return None
-                except Exception as e3:
-                    logging.error(f"❌ All extraction methods failed: {e3}")
-                    return None
-        
-        # Check extraction result
-        extracted_items = os.listdir(PROFILE_PATH)
-        logging.info(f"📁 Extracted items: {extracted_items}")
-        
-        if not extracted_items:
-            logging.error("❌ No files extracted")
-            return None
+            logging.info("📦 Extracting double-compressed profile...")
             
-        # Find profile directory
-        profile_dir = None
-        for item in extracted_items:
-            item_path = os.path.join(PROFILE_PATH, item)
-            if os.path.isdir(item_path):
-                profile_dir = item_path
-                break
-        
-        if not profile_dir:
-            profile_dir = PROFILE_PATH
-        
-        logging.info(f"✅ Profile ready at: {profile_dir}")
-        return profile_dir
+            # First extract: .tar.gz to .tar
+            temp_tar = "/tmp/firefox_profile.tar"
+            
+            with tarfile.open(PROFILE_BACKUP, 'r:gz') as tar_gz:
+                # List contents first to see what's inside
+                members = tar_gz.getmembers()
+                logging.info(f"📁 First layer contains {len(members)} items")
+                for member in members:
+                    logging.info(f"   - {member.name}")
+                
+                # Extract the .tar file
+                tar_gz.extractall("/tmp")
+                logging.info("✅ First extraction: .tar.gz to .tar")
+            
+            # Find the extracted .tar file
+            tar_files = [f for f in os.listdir("/tmp") if f.endswith('.tar')]
+            if tar_files:
+                temp_tar = f"/tmp/{tar_files[0]}"
+                logging.info(f"📦 Found tar file: {tar_files[0]}")
+            else:
+                logging.error("❌ No .tar file found after first extraction")
+                return None
+            
+            # Second extract: .tar to actual files
+            with tarfile.open(temp_tar, 'r') as tar:
+                members = tar.getmembers()
+                logging.info(f"📁 Second layer contains {len(members)} files")
+                tar.extractall(PROFILE_PATH)
+                logging.info("✅ Second extraction: .tar to files")
+            
+            # Clean up temp file
+            if os.path.exists(temp_tar):
+                os.remove(temp_tar)
+            
+            extracted_items = os.listdir(PROFILE_PATH)
+            logging.info(f"📁 Final extracted items: {extracted_items}")
+            
+            if not extracted_items:
+                logging.error("❌ No files extracted")
+                return None
+                
+            # Find profile directory
+            profile_dir = None
+            for item in extracted_items:
+                item_path = os.path.join(PROFILE_PATH, item)
+                if os.path.isdir(item_path):
+                    profile_dir = item_path
+                    break
+            
+            if not profile_dir:
+                profile_dir = PROFILE_PATH
+            
+            logging.info(f"✅ Profile ready at: {profile_dir}")
+            return profile_dir
+            
+        except Exception as e:
+            logging.error(f"❌ Double extraction failed: {e}")
+            return None
 
     def setup_browser_with_profile(self, profile_dir):
         """Setup Firefox with minimal profile"""
