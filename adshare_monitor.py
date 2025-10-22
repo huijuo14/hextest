@@ -36,8 +36,8 @@ class AdShareMonitor:
         self.is_running = False
         
     def download_firefox_profile(self):
-        """Download Firefox profile from MediaFire"""
-        logging.info("📥 Downloading Firefox profile from MediaFire...")
+        """Download Firefox profile from GitHub"""
+        logging.info("📥 Downloading Firefox profile...")
         
         # Clean up existing files
         if os.path.exists(PROFILE_BACKUP):
@@ -47,36 +47,22 @@ class AdShareMonitor:
             
         os.makedirs(PROFILE_PATH, exist_ok=True)
         
-        mediafire_url = "https://github.com/huijuo14/hextest/releases/download/v1.0/firefox_profile_backup.tar.1.gz"
+        # Use your GitHub direct download URL
+        profile_url = "YOUR_GITHUB_DIRECT_DOWNLOAD_URL_HERE"
         
         try:
-            # Method 1: Use wget (most reliable)
-            logging.info("🔄 Downloading with wget...")
-            result = os.system(f'wget -O "{PROFILE_BACKUP}" "{mediafire_url}" --timeout=60 --tries=3')
+            logging.info("🔄 Downloading profile...")
+            result = os.system(f'wget -O "{PROFILE_BACKUP}" "{profile_url}" --timeout=60 --tries=3')
             
             if result == 0 and os.path.exists(PROFILE_BACKUP) and os.path.getsize(PROFILE_BACKUP) > 1000000:
                 file_size = os.path.getsize(PROFILE_BACKUP)
-                logging.info(f"✅ Profile downloaded via wget: {file_size} bytes")
-                return True
-            
-            # Method 2: Use requests as fallback
-            logging.info("🔄 Trying with requests...")
-            response = requests.get(mediafire_url, stream=True, timeout=60)
-            response.raise_for_status()
-            
-            with open(PROFILE_BACKUP, 'wb') as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    f.write(chunk)
-            
-            if os.path.exists(PROFILE_BACKUP) and os.path.getsize(PROFILE_BACKUP) > 1000000:
-                file_size = os.path.getsize(PROFILE_BACKUP)
-                logging.info(f"✅ Profile downloaded via requests: {file_size} bytes")
+                logging.info(f"✅ Profile downloaded: {file_size} bytes")
                 return True
                 
         except Exception as e:
             logging.error(f"❌ Download failed: {e}")
         
-        logging.error("❌ All download attempts failed")
+        logging.error("❌ Download failed")
         return False
 
     def extract_profile(self):
@@ -87,26 +73,16 @@ class AdShareMonitor:
             with tarfile.open(PROFILE_BACKUP, 'r:gz') as tar:
                 tar.extractall(PROFILE_PATH)
             
-            # Check what was extracted
             extracted_items = os.listdir(PROFILE_PATH)
             logging.info(f"📁 Extracted items: {extracted_items}")
             
-            # Look for profile directories
+            # Find profile directory
             profile_dir = None
             for item in extracted_items:
                 item_path = os.path.join(PROFILE_PATH, item)
                 if os.path.isdir(item_path):
-                    if 'default' in item or 'release' in item or 'profile' in item:
-                        profile_dir = item_path
-                        break
-            
-            if not profile_dir and extracted_items:
-                # Use first directory found
-                for item in extracted_items:
-                    item_path = os.path.join(PROFILE_PATH, item)
-                    if os.path.isdir(item_path):
-                        profile_dir = item_path
-                        break
+                    profile_dir = item_path
+                    break
             
             if profile_dir:
                 logging.info(f"✅ Profile extracted to: {profile_dir}")
@@ -119,13 +95,13 @@ class AdShareMonitor:
             logging.error(f"❌ Extraction failed: {e}")
             return None
 
-    def setup_browser_with_profile(self, profile_dir):
-        """Setup Firefox with custom profile"""
+    def setup_browser_with_profile_optimized(self, profile_dir):
+        """Setup Firefox with profile - MEMORY OPTIMIZED"""
         try:
-            logging.info("🦊 Setting up Firefox with custom profile...")
+            logging.info("🦊 Setting up Firefox with profile (optimized for 512MB RAM)...")
             
             # Set up virtual display
-            os.system('Xvfb :99 -screen 0 1024x768x16 &')
+            os.system('Xvfb :99 -screen 0 800x600x16 &')
             os.environ['DISPLAY'] = ':99'
             
             options = Options()
@@ -133,25 +109,42 @@ class AdShareMonitor:
             options.add_argument("--no-sandbox")
             options.add_argument("--disable-dev-shm-usage")
             options.add_argument("--disable-gpu")
-            options.add_argument("--window-size=1024,768")
+            options.add_argument("--window-size=800,600")  # Smaller window
             
-            # Use the custom profile
+            # CRITICAL MEMORY OPTIMIZATIONS
+            options.set_preference("browser.startup.homepage", "about:blank")
+            options.set_preference("browser.startup.page", 0)
+            options.set_preference("dom.ipc.processCount", 1)
+            options.set_preference("dom.ipc.processCount.webIsolated", 1)
+            options.set_preference("browser.tabs.remote.autostart", False)
+            options.set_preference("browser.tabs.remote.autostart.2", False)
+           
+            
+            # Disable all unnecessary features
+            options.set_preference("javascript.options.mem.max", 51200)  # 50MB max JS memory
+            options.set_preference("browser.sessionstore.interval", 300000)  # 5 minutes
+            options.set_preference("browser.sessionstore.max_resumed_crashes", 0)
+            options.set_preference("browser.sessionstore.resume_from_crash", False)
+            
+            # Disable cache completely
+            options.set_preference("browser.cache.disk.enable", False)
+            options.set_preference("browser.cache.memory.enable", False)
+            options.set_preference("browser.cache.offline.enable", False)
+            options.set_preference("network.http.use-cache", False)
+            
+            # Use the profile
             options.add_argument(f"-profile")
             options.add_argument(profile_dir)
             
-            # Memory optimizations
-            options.set_preference("browser.tabs.remote.autostart", False)
-            options.set_preference("browser.tabs.remote.autostart.2", False)
-            options.set_preference("dom.ipc.processCount", 1)
-            options.set_preference("browser.sessionstore.resume_from_crash", False)
-            options.set_preference("browser.cache.disk.enable", False)
-            options.set_preference("browser.cache.memory.enable", False)
-            
+            # Start browser with minimal resources
             self.browser = webdriver.Firefox(options=options)
-            self.browser.set_page_load_timeout(30)
-            self.browser.implicitly_wait(10)
             
-            logging.info("✅ Firefox started with custom profile!")
+            # Minimal timeouts
+            self.browser.set_page_load_timeout(45)
+            self.browser.implicitly_wait(15)
+            self.browser.set_script_timeout(30)
+            
+            logging.info("✅ Firefox started with optimized memory settings!")
             return True
             
         except Exception as e:
@@ -159,32 +152,31 @@ class AdShareMonitor:
             return False
 
     def check_login_status(self):
-        """Check if we're logged in and navigate to surf page"""
+        """Check if we're logged in using the profile"""
         try:
-            logging.info("🌐 Checking login status...")
+            logging.info("🌐 Checking login status with profile...")
             
-            # First, try going directly to surf page
+            # Try going to surf page
             self.browser.get("https://adsha.re/surf")
-            time.sleep(8)
+            time.sleep(10)  # Give more time for profile to load
             
             current_url = self.browser.current_url
             logging.info(f"📍 Current URL: {current_url}")
             
-            # If we're on surf page, we're good
+            # If profile has active session, we should be on surf page
             if "surf" in current_url:
-                logging.info("✅ Already logged in and on surf page!")
+                logging.info("✅ Profile has active session! On surf page.")
                 return True
                 
-            # If we're on login page, try to login
+            # If login needed, try login
             elif "login" in current_url:
                 logging.info("🔐 Profile needs login...")
                 return self.perform_login()
                 
             else:
-                # Some other page, try to navigate to surf
-                logging.info("🔄 Navigating to surf page...")
+                logging.info("🔄 Navigating directly to surf...")
                 self.browser.get("https://adsha.re/surf")
-                time.sleep(8)
+                time.sleep(10)
                 return "surf" in self.browser.current_url
                 
         except Exception as e:
@@ -192,19 +184,12 @@ class AdShareMonitor:
             return False
 
     def perform_login(self):
-        """Perform login with multiple selector attempts"""
+        """Perform login"""
         try:
             logging.info("🔐 Performing login...")
             
-            # Try multiple email field selectors
-            email_selectors = [
-                "input[name='mail']",
-                "input[type='email']", 
-                "input[name='email']",
-                "input[id*='mail']",
-                "input[id*='email']"
-            ]
-            
+            # Email field
+            email_selectors = ["input[name='mail']", "input[type='email']"]
             email_field = None
             for selector in email_selectors:
                 try:
@@ -214,99 +199,37 @@ class AdShareMonitor:
                     continue
             
             if email_field:
-                email_field.clear()
                 email_field.send_keys(EMAIL)
                 logging.info("📧 Email entered")
                 time.sleep(2)
-            else:
-                logging.error("❌ Could not find email field")
-                return False
             
-            # Try multiple password field selectors
-            password_selectors = [
-                "input[type='password']",
-                "input[name='password']",
-                "input[name='pass']",
-                "input[id*='password']",
-                "input[id*='pass']"
-            ]
-            
-            password_field = None
-            for selector in password_selectors:
-                try:
-                    password_field = self.browser.find_element(By.CSS_SELECTOR, selector)
-                    break
-                except:
-                    continue
-            
-            if not password_field:
-                logging.error("❌ Could not find password field")
-                # Save page source for debugging
-                try:
-                    with open("/tmp/login_page.html", "w") as f:
-                        f.write(self.browser.page_source)
-                    logging.info("📄 Saved page source to /tmp/login_page.html")
-                except:
-                    pass
-                return False
-            
-            password_field.clear()
+            # Password field
+            password_field = self.browser.find_element(By.CSS_SELECTOR, "input[type='password']")
             password_field.send_keys(PASSWORD)
             logging.info("🔑 Password entered")
             time.sleep(2)
             
-            # Try multiple login button selectors
-            login_selectors = [
-                "button[type='submit']",
-                "input[type='submit']",
-                "button[onclick*='submit']",
-                ".login-btn",
-                ".submit-btn",
-                "a.button[onclick*='submit']"
-            ]
+            # Login button
+            login_btn = self.browser.find_element(By.CSS_SELECTOR, "button[type='submit'], input[type='submit']")
+            login_btn.click()
+            logging.info("🔄 Login button clicked")
+            time.sleep(10)
             
-            login_btn = None
-            for selector in login_selectors:
-                try:
-                    login_btn = self.browser.find_element(By.CSS_SELECTOR, selector)
-                    break
-                except:
-                    continue
-            
-            # If no button found by CSS, try by text
-            if not login_btn:
-                try:
-                    buttons = self.browser.find_elements(By.TAG_NAME, "button")
-                    for btn in buttons:
-                        if "login" in btn.text.lower() or "sign in" in btn.text.lower():
-                            login_btn = btn
-                            break
-                except:
-                    pass
-            
-            if login_btn:
-                login_btn.click()
-                logging.info("🔄 Login button clicked")
-                time.sleep(10)
-                
-                # Check if login successful
-                if "surf" in self.browser.current_url:
-                    logging.info("✅ Login successful!")
-                    return True
-                else:
-                    logging.error("❌ Login failed - not on surf page")
-                    return False
+            # Check success
+            if "surf" in self.browser.current_url:
+                logging.info("✅ Login successful!")
+                return True
             else:
-                logging.error("❌ Could not find login button")
+                logging.error("❌ Login failed")
                 return False
                 
         except Exception as e:
             logging.error(f"❌ Login failed: {e}")
             return False
 
-    def monitor_loop(self):
-        """Main monitoring loop"""
-        logging.info("🎯 Starting monitoring loop...")
+    def simple_monitor(self):
+        """Simple monitoring to save memory"""
+        logging.info("🎯 Starting memory-optimized monitoring...")
         self.is_running = True
         iteration = 0
         
@@ -314,28 +237,17 @@ class AdShareMonitor:
             iteration += 1
             
             try:
-                # Refresh page every 15 minutes to keep session alive
-                if iteration % 18 == 0:  # 18 * 50s = 15 minutes
+                # Refresh every 20 minutes (less frequent to save memory)
+                if iteration % 24 == 0:
                     logging.info("🔄 Refreshing page...")
                     try:
                         self.browser.refresh()
-                        time.sleep(8)
-                        
-                        # Check if we got logged out
-                        if "login" in self.browser.current_url:
-                            logging.info("🔐 Session expired, re-logging in...")
-                            if not self.perform_login():
-                                logging.error("❌ Re-login failed, restarting...")
-                                break
+                        time.sleep(10)
                     except Exception as e:
                         logging.warning(f"⚠️ Refresh failed: {e}")
                 
-                # Extract credits every 30 minutes
-                if iteration % 36 == 0:
-                    credits = self.extract_credits()
-                    logging.info(f"💰 Current credits: {credits}")
-                
-                time.sleep(50)  # 50 second intervals
+                # Minimal operation - just sleep
+                time.sleep(50)
                 
             except Exception as e:
                 logging.error(f"❌ Monitoring error: {e}")
@@ -343,29 +255,8 @@ class AdShareMonitor:
         
         self.is_running = False
 
-    def extract_credits(self):
-        """Extract credit information from page"""
-        try:
-            page_source = self.browser.page_source
-            
-            patterns = [
-                r'(\d{1,3}(?:,\d{3})*)\s*Credits',
-                r'Credits.*?(\d{1,3}(?:,\d{3})*)',
-                r'balance.*?(\d[\d,]*)',
-            ]
-            
-            for pattern in patterns:
-                matches = re.findall(pattern, page_source, re.IGNORECASE)
-                if matches:
-                    return f"{matches[0]} Credits"
-            
-            return "Credits not found"
-            
-        except Exception as e:
-            return f"Error: {str(e)}"
-
     def cleanup(self):
-        """Cleanup resources"""
+        """Cleanup"""
         try:
             if self.browser:
                 self.browser.quit()
@@ -379,8 +270,7 @@ def health_check():
     return jsonify({
         "status": "running", 
         "browser_alive": monitor.browser is not None,
-        "monitor_running": monitor.is_running,
-        "service": "AdShare Monitor with Custom Profile"
+        "monitor_running": monitor.is_running
     })
 
 @app.route('/health')
@@ -394,34 +284,34 @@ if __name__ == "__main__":
     # Start health server
     flask_thread = threading.Thread(target=start_flask, daemon=True)
     flask_thread.start()
-    logging.info("✅ Health server started on port 8080")
+    logging.info("✅ Health server started")
     
     try:
-        # Step 1: Download Firefox profile
+        # Download profile
         if not monitor.download_firefox_profile():
             logging.error("❌ Failed to download profile")
             exit(1)
         
-        # Step 2: Extract profile
+        # Extract profile
         profile_dir = monitor.extract_profile()
         if not profile_dir:
             logging.error("❌ Failed to extract profile")
             exit(1)
         
-        # Step 3: Setup browser with profile
-        if not monitor.setup_browser_with_profile(profile_dir):
-            logging.error("❌ Failed to setup browser with profile")
+        # Setup browser with memory optimizations
+        if not monitor.setup_browser_with_profile_optimized(profile_dir):
+            logging.error("❌ Failed to setup browser")
             exit(1)
         
-        # Step 4: Check login and navigate to surf
+        # Check login
         if not monitor.check_login_status():
-            logging.error("❌ Failed to login/navigate to surf")
+            logging.error("❌ Failed to reach surf page")
             monitor.cleanup()
             exit(1)
         
-        # Step 5: Start monitoring
+        # Start monitoring
         logging.info("✅ All systems go! Starting monitoring...")
-        monitor.monitor_loop()
+        monitor.simple_monitor()
         
     except Exception as e:
         logging.error(f"💥 Main execution failed: {e}")
