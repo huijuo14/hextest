@@ -16,7 +16,7 @@ import threading
 from flask import Flask, jsonify
 import signal
 
-# ========== CONFIGURATION ==========
+# ========== CONFIGURATION =========
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "8332116388:AAGbWaVQic0g7m5DU1USSXgXjP-bHKkPbsQ")
 EMAIL = os.getenv("ADSHARE_EMAIL", "loginallapps@gmail.com")
 PASSWORD = os.getenv("ADSHARE_PASSWORD", "@Sd2007123")
