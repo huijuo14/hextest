@@ -48,7 +48,7 @@ class AdShareMonitor:
         os.makedirs(PROFILE_PATH, exist_ok=True)
         
         # Use your GitHub direct download URL
-        profile_url = "YOUR_GITHUB_DIRECT_DOWNLOAD_URL_HERE"
+        profile_url = "https://github.com/huijuo14/hextest/releases/download/v1.0/firefox_profile_backup.tar.1.gz"
         
         try:
             logging.info("🔄 Downloading profile...")
