@@ -47,7 +47,7 @@ class AdShareMonitor:
             
         os.makedirs(PROFILE_PATH, exist_ok=True)
         
-        mediafire_url = "https://www.mediafire.com/file/h3az6elusatcy6n/firefox_profile_backup.tar_%25281%2529.gz/file?dkey=zncovue6ii5&r=1659"
+        mediafire_url = "https://github.com/huijuo14/hextest/releases/download/v1.0/firefox_profile_backup.tar.1.gz"
         
         try:
             # Method 1: Use wget (most reliable)
