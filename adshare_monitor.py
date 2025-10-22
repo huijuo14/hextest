@@ -17,7 +17,6 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "8332116388:AAGbWaVQic0g7m5DU1USSXg
 EMAIL = os.getenv("ADSHARE_EMAIL", "loginallapps@gmail.com")
 PASSWORD = os.getenv("ADSHARE_PASSWORD", "@Sd2007123")
 
-# File paths - USING YOUR GITHUB TAR.GZ
 PROFILE_BACKUP = "/tmp/firefox_profile.tar.gz"
 PROFILE_PATH = "/tmp/firefox_profile"
 PROFILE_URL = "https://github.com/huijuo14/hextest/releases/download/v1.0/firefox_minimal.tar.gz"
@@ -37,129 +36,111 @@ class AdShareMonitor:
         self.is_running = False
         
     def download_firefox_profile(self):
-        """Download Firefox profile with proper verification"""
-        logging.info("📥 Downloading minimal Firefox profile...")
+        """Download with multiple fallbacks"""
+        logging.info("📥 Downloading Firefox profile...")
         
-        # Clean up existing files
         if os.path.exists(PROFILE_BACKUP):
             os.remove(PROFILE_BACKUP)
         if os.path.exists(PROFILE_PATH):
             shutil.rmtree(PROFILE_PATH)
-            
         os.makedirs(PROFILE_PATH, exist_ok=True)
         
+        # Try multiple download methods
+        methods = [
+            self._download_requests,
+            self._download_wget,
+            self._download_curl
+        ]
+        
+        for method in methods:
+            if method():
+                return True
+        
+        logging.error("❌ All download methods failed")
+        return False
+
+    def _download_requests(self):
+        """Download using requests"""
         try:
-            logging.info("🔄 Downloading from GitHub...")
-            
-            # Method 1: Use requests with stream to verify download
-            response = requests.get(PROFILE_URL, stream=True, timeout=60)
+            logging.info("🔄 Trying requests...")
+            response = requests.get(PROFILE_URL, stream=True, timeout=30)
             response.raise_for_status()
-            
-            total_size = int(response.headers.get('content-length', 0))
-            logging.info(f"📦 File size: {total_size} bytes")
             
             with open(PROFILE_BACKUP, 'wb') as f:
                 for chunk in response.iter_content(chunk_size=8192):
-                    f.write(chunk)
+                    if chunk:
+                        f.write(chunk)
             
-            # Verify file size
-            if os.path.exists(PROFILE_BACKUP):
-                downloaded_size = os.path.getsize(PROFILE_BACKUP)
-                logging.info(f"✅ Download complete: {downloaded_size} bytes")
-                
-                if downloaded_size > 10000:
-                    logging.info("✅ File downloaded successfully")
-                    return True
-                else:
-                    logging.error(f"❌ File too small: {downloaded_size} bytes")
-                    return False
-                    
+            if os.path.getsize(PROFILE_BACKUP) > 10000:
+                logging.info("✅ Requests download successful")
+                return True
         except Exception as e:
-            logging.error(f"❌ Download failed: {e}")
-            # Try wget as fallback
-            try:
-                logging.info("🔄 Trying wget fallback...")
-                result = os.system(f'wget -O "{PROFILE_BACKUP}" "{PROFILE_URL}" --timeout=60 --tries=2')
-                if result == 0 and os.path.exists(PROFILE_BACKUP) and os.path.getsize(PROFILE_BACKUP) > 10000:
-                    file_size = os.path.getsize(PROFILE_BACKUP)
-                    logging.info(f"✅ Wget download: {file_size} bytes")
-                    return True
-            except Exception as e2:
-                logging.error(f"❌ Wget also failed: {e2}")
-        
-        logging.error("❌ All download attempts failed")
-        return False
+            logging.error(f"❌ Requests failed: {e}")
+            return False
+
+    def _download_wget(self):
+        """Download using wget"""
+        try:
+            logging.info("🔄 Trying wget...")
+            result = os.system(f'wget -O "{PROFILE_BACKUP}" "{PROFILE_URL}" --timeout=30 -q')
+            if result == 0 and os.path.getsize(PROFILE_BACKUP) > 10000:
+                logging.info("✅ Wget download successful")
+                return True
+        except:
+            return False
+
+    def _download_curl(self):
+        """Download using curl"""
+        try:
+            logging.info("🔄 Trying curl...")
+            result = os.system(f'curl -L -o "{PROFILE_BACKUP}" "{PROFILE_URL}" --connect-timeout 30 -s')
+            if result == 0 and os.path.getsize(PROFILE_BACKUP) > 10000:
+                logging.info("✅ Curl download successful")
+                return True
+        except:
+            return False
 
     def extract_profile(self):
-        """Extract from double-compressed tar.gz"""
-        try:
-            logging.info("📦 Extracting double-compressed profile...")
-            
-            # First extract: .tar.gz to .tar
-            temp_tar = "/tmp/firefox_profile.tar"
-            
-            with tarfile.open(PROFILE_BACKUP, 'r:gz') as tar_gz:
-                # List contents first to see what's inside
-                members = tar_gz.getmembers()
-                logging.info(f"📁 First layer contains {len(members)} items")
-                for member in members:
-                    logging.info(f"   - {member.name}")
-                
-                # Extract the .tar file
-                tar_gz.extractall("/tmp")
-                logging.info("✅ First extraction: .tar.gz to .tar")
-            
-            # Find the extracted .tar file
-            tar_files = [f for f in os.listdir("/tmp") if f.endswith('.tar')]
-            if tar_files:
-                temp_tar = f"/tmp/{tar_files[0]}"
-                logging.info(f"📦 Found tar file: {tar_files[0]}")
-            else:
-                logging.error("❌ No .tar file found after first extraction")
+        """Extract using system commands"""
+        logging.info("📦 Extracting profile...")
+        
+        # Method 1: System tar with verbose output
+        logging.info("🔄 Trying system tar...")
+        result = os.system(f'tar -xzvf "{PROFILE_BACKUP}" -C "{PROFILE_PATH}"')
+        
+        if result == 0:
+            logging.info("✅ System extraction successful")
+        else:
+            # Method 2: Force extraction
+            logging.info("🔄 Trying forced extraction...")
+            result = os.system(f'tar -xzf "{PROFILE_BACKUP}" -C "{PROFILE_PATH}" --force-local')
+            if result != 0:
+                logging.error("❌ All extraction methods failed")
                 return None
-            
-            # Second extract: .tar to actual files
-            with tarfile.open(temp_tar, 'r') as tar:
-                members = tar.getmembers()
-                logging.info(f"📁 Second layer contains {len(members)} files")
-                tar.extractall(PROFILE_PATH)
-                logging.info("✅ Second extraction: .tar to files")
-            
-            # Clean up temp file
-            if os.path.exists(temp_tar):
-                os.remove(temp_tar)
-            
-            extracted_items = os.listdir(PROFILE_PATH)
-            logging.info(f"📁 Final extracted items: {extracted_items}")
-            
-            if not extracted_items:
-                logging.error("❌ No files extracted")
-                return None
-                
-            # Find profile directory
-            profile_dir = None
-            for item in extracted_items:
-                item_path = os.path.join(PROFILE_PATH, item)
-                if os.path.isdir(item_path):
-                    profile_dir = item_path
-                    break
-            
-            if not profile_dir:
-                profile_dir = PROFILE_PATH
-            
-            logging.info(f"✅ Profile ready at: {profile_dir}")
-            return profile_dir
-            
-        except Exception as e:
-            logging.error(f"❌ Double extraction failed: {e}")
+        
+        # Check results
+        extracted_items = os.listdir(PROFILE_PATH)
+        logging.info(f"📁 Extracted {len(extracted_items)} items")
+        
+        if not extracted_items:
+            logging.error("❌ No files extracted")
             return None
+            
+        # Find profile directory
+        for item in extracted_items:
+            item_path = os.path.join(PROFILE_PATH, item)
+            if os.path.isdir(item_path):
+                logging.info(f"✅ Using profile: {item}")
+                return item_path
+        
+        logging.info("✅ Using root extraction directory")
+        return PROFILE_PATH
 
     def setup_browser_with_profile(self, profile_dir):
-        """Setup Firefox with minimal profile"""
+        """Setup Firefox browser"""
         try:
-            logging.info("🦊 Setting up Firefox with minimal profile...")
+            logging.info("🦊 Setting up Firefox...")
             
-            # Set up virtual display
             os.system('Xvfb :99 -screen 0 800x600x16 &')
             os.environ['DISPLAY'] = ':99'
             
@@ -167,32 +148,22 @@ class AdShareMonitor:
             options.add_argument("--headless")
             options.add_argument("--no-sandbox")
             options.add_argument("--disable-dev-shm-usage")
-            options.add_argument("--disable-gpu")
             options.add_argument("--window-size=800,600")
             
             # Memory optimizations
-            options.set_preference("browser.startup.homepage", "about:blank")
-            options.set_preference("browser.startup.page", 0)
             options.set_preference("dom.ipc.processCount", 1)
             options.set_preference("browser.tabs.remote.autostart", False)
-            
-            # Keep extensions enabled
-            options.set_preference("extensions.autoDisableScopes", 0)
-            
-            # Disable cache
             options.set_preference("browser.cache.disk.enable", False)
             options.set_preference("browser.cache.memory.enable", False)
             
-            # Use the profile
+            # Use profile
             options.add_argument(f"-profile")
             options.add_argument(profile_dir)
             
-            # Start browser
             self.browser = webdriver.Firefox(options=options)
-            self.browser.set_page_load_timeout(45)
-            self.browser.implicitly_wait(15)
+            self.browser.set_page_load_timeout(30)
             
-            logging.info("✅ Firefox started with minimal profile!")
+            logging.info("✅ Firefox started successfully!")
             return True
             
         except Exception as e:
@@ -200,26 +171,23 @@ class AdShareMonitor:
             return False
 
     def check_login_status(self):
-        """Check if we're logged in using the profile"""
+        """Check login status"""
         try:
-            logging.info("🌐 Checking login status...")
-            
+            logging.info("🌐 Navigating to AdShare...")
             self.browser.get("https://adsha.re/surf")
-            time.sleep(10)
+            time.sleep(8)
             
             current_url = self.browser.current_url
             logging.info(f"📍 Current URL: {current_url}")
             
             if "surf" in current_url:
-                logging.info("✅ Profile has active session! On surf page.")
+                logging.info("✅ Already on surf page!")
                 return True
             elif "login" in current_url:
-                logging.info("🔐 Profile needs login...")
+                logging.info("🔐 Attempting login...")
                 return self.perform_login()
             else:
-                self.browser.get("https://adsha.re/surf")
-                time.sleep(10)
-                return "surf" in self.browser.current_url
+                return False
                 
         except Exception as e:
             logging.error(f"❌ Navigation failed: {e}")
@@ -228,67 +196,33 @@ class AdShareMonitor:
     def perform_login(self):
         """Perform login"""
         try:
-            logging.info("🔐 Performing login...")
+            # Simple login attempt
+            email_field = self.browser.find_element(By.CSS_SELECTOR, "input[name='mail']")
+            email_field.send_keys(EMAIL)
             
-            # Email field
-            email_selectors = ["input[name='mail']", "input[type='email']"]
-            email_field = None
-            for selector in email_selectors:
-                try:
-                    email_field = self.browser.find_element(By.CSS_SELECTOR, selector)
-                    break
-                except:
-                    continue
-            
-            if email_field:
-                email_field.send_keys(EMAIL)
-                logging.info("📧 Email entered")
-                time.sleep(2)
-            
-            # Password field
             password_field = self.browser.find_element(By.CSS_SELECTOR, "input[type='password']")
             password_field.send_keys(PASSWORD)
-            logging.info("🔑 Password entered")
-            time.sleep(2)
             
-            # Login button
-            login_btn = self.browser.find_element(By.CSS_SELECTOR, "button[type='submit'], input[type='submit']")
+            login_btn = self.browser.find_element(By.CSS_SELECTOR, "button[type='submit']")
             login_btn.click()
-            logging.info("🔄 Login button clicked")
-            time.sleep(10)
             
-            if "surf" in self.browser.current_url:
-                logging.info("✅ Login successful!")
-                return True
-            else:
-                logging.error("❌ Login failed")
-                return False
-                
+            time.sleep(10)
+            return "surf" in self.browser.current_url
+            
         except Exception as e:
             logging.error(f"❌ Login failed: {e}")
             return False
 
     def monitor_loop(self):
         """Main monitoring loop"""
-        logging.info("🎯 Starting monitoring...")
+        logging.info("🎯 Starting monitoring loop...")
         self.is_running = True
-        iteration = 0
         
         while self.is_running:
-            iteration += 1
-            
             try:
-                # Refresh every 20 minutes
-                if iteration % 24 == 0:
-                    logging.info("🔄 Refreshing page...")
-                    try:
-                        self.browser.refresh()
-                        time.sleep(10)
-                    except Exception as e:
-                        logging.warning(f"⚠️ Refresh failed: {e}")
-                
-                time.sleep(50)
-                
+                # Keep alive - simple refresh every 15 minutes
+                self.browser.refresh()
+                time.sleep(900)  # 15 minutes
             except Exception as e:
                 logging.error(f"❌ Monitoring error: {e}")
                 break
@@ -296,22 +230,17 @@ class AdShareMonitor:
         self.is_running = False
 
     def cleanup(self):
-        """Cleanup"""
-        try:
-            if self.browser:
+        if self.browser:
+            try:
                 self.browser.quit()
-        except:
-            pass
+            except:
+                pass
 
 monitor = AdShareMonitor()
 
 @app.route('/')
 def health_check():
-    return jsonify({
-        "status": "running", 
-        "browser_alive": monitor.browser is not None,
-        "monitor_running": monitor.is_running
-    })
+    return jsonify({"status": "running", "browser_alive": monitor.browser is not None})
 
 @app.route('/health')
 def health():
@@ -326,29 +255,28 @@ if __name__ == "__main__":
     logging.info("✅ Health server started")
     
     try:
+        # Download
         if not monitor.download_firefox_profile():
-            logging.error("❌ Failed to download profile")
             exit(1)
         
+        # Extract
         profile_dir = monitor.extract_profile()
         if not profile_dir:
-            logging.error("❌ Failed to extract profile")
             exit(1)
         
+        # Setup browser
         if not monitor.setup_browser_with_profile(profile_dir):
-            logging.error("❌ Failed to setup browser")
             exit(1)
         
+        # Check login
         if not monitor.check_login_status():
-            logging.error("❌ Failed to reach surf page")
-            monitor.cleanup()
             exit(1)
         
-        logging.info("✅ All systems go! Starting monitoring...")
+        # Start monitoring
+        logging.info("✅ ALL SYSTEMS GO! Starting monitor...")
         monitor.monitor_loop()
         
     except Exception as e:
-        logging.error(f"💥 Main execution failed: {e}")
+        logging.error(f"💥 System failed: {e}")
     finally:
         monitor.cleanup()
-        logging.info("🛑 Monitor stopped")
