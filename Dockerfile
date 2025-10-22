@@ -7,7 +7,7 @@ RUN apt-get update && apt-get install -y \
     xvfb \
     && rm -rf /var/lib/apt/lists/*
 
-# REMOVE any existing geckodriver and install CORRECT version
+# Install CORRECT geckodriver version
 RUN rm -f /usr/local/bin/geckodriver
 RUN wget https://github.com/mozilla/geckodriver/releases/download/v0.36.0/geckodriver-v0.36.0-linux64.tar.gz \
     && tar -xzf geckodriver-v0.36.0-linux64.tar.gz \
@@ -15,8 +15,8 @@ RUN wget https://github.com/mozilla/geckodriver/releases/download/v0.36.0/geckod
     && mv geckodriver /usr/local/bin/ \
     && rm geckodriver-v0.36.0-linux64.tar.gz
 
-# Verify installation
-RUN geckodriver --version
+# Install gdown for Google Drive downloads
+RUN pip install gdown
 
 WORKDIR /app
 COPY requirements.txt .
