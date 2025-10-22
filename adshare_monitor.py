@@ -37,7 +37,7 @@ class AdShareMonitor:
         self.is_running = False
         
     def download_firefox_profile(self):
-        """Download Firefox profile from GitHub"""
+        """Download Firefox profile with proper verification"""
         logging.info("📥 Downloading minimal Firefox profile...")
         
         # Clean up existing files
@@ -50,52 +50,102 @@ class AdShareMonitor:
         
         try:
             logging.info("🔄 Downloading from GitHub...")
-            result = os.system(f'wget -O "{PROFILE_BACKUP}" "{PROFILE_URL}" --timeout=60 --tries=3')
             
-            if result == 0 and os.path.exists(PROFILE_BACKUP) and os.path.getsize(PROFILE_BACKUP) > 10000:
-                file_size = os.path.getsize(PROFILE_BACKUP)
-                logging.info(f"✅ Profile downloaded: {file_size} bytes")
-                return True
+            # Method 1: Use requests with stream to verify download
+            response = requests.get(PROFILE_URL, stream=True, timeout=60)
+            response.raise_for_status()
+            
+            total_size = int(response.headers.get('content-length', 0))
+            logging.info(f"📦 File size: {total_size} bytes")
+            
+            with open(PROFILE_BACKUP, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+            
+            # Verify file size
+            if os.path.exists(PROFILE_BACKUP):
+                downloaded_size = os.path.getsize(PROFILE_BACKUP)
+                logging.info(f"✅ Download complete: {downloaded_size} bytes")
                 
+                if downloaded_size > 10000:
+                    logging.info("✅ File downloaded successfully")
+                    return True
+                else:
+                    logging.error(f"❌ File too small: {downloaded_size} bytes")
+                    return False
+                    
         except Exception as e:
             logging.error(f"❌ Download failed: {e}")
+            # Try wget as fallback
+            try:
+                logging.info("🔄 Trying wget fallback...")
+                result = os.system(f'wget -O "{PROFILE_BACKUP}" "{PROFILE_URL}" --timeout=60 --tries=2')
+                if result == 0 and os.path.exists(PROFILE_BACKUP) and os.path.getsize(PROFILE_BACKUP) > 10000:
+                    file_size = os.path.getsize(PROFILE_BACKUP)
+                    logging.info(f"✅ Wget download: {file_size} bytes")
+                    return True
+            except Exception as e2:
+                logging.error(f"❌ Wget also failed: {e2}")
         
-        logging.error("❌ Download failed")
+        logging.error("❌ All download attempts failed")
         return False
 
     def extract_profile(self):
-        """Extract the Firefox profile from TAR.GZ"""
+        """Extract with multiple fallback methods"""
+        logging.info("📦 Extracting Firefox profile...")
+        
+        # Method 1: Python tarfile
         try:
-            logging.info("📦 Extracting Firefox profile...")
-            
             with tarfile.open(PROFILE_BACKUP, 'r:gz') as tar:
+                members = tar.getmembers()
+                logging.info(f"📁 Archive contains {len(members)} files")
                 tar.extractall(PROFILE_PATH)
-            
-            extracted_items = os.listdir(PROFILE_PATH)
-            logging.info(f"📁 Extracted items: {extracted_items}")
-            
-            # Find profile directory
-            profile_dir = None
-            for item in extracted_items:
-                item_path = os.path.join(PROFILE_PATH, item)
-                if os.path.isdir(item_path):
-                    profile_dir = item_path
-                    break
-            
-            # If no subdirectory, use the extracted path directly
-            if not profile_dir:
-                profile_dir = PROFILE_PATH
-            
-            if profile_dir:
-                logging.info(f"✅ Profile extracted to: {profile_dir}")
-                return profile_dir
-            else:
-                logging.error("❌ No profile directory found")
-                return None
-                
+            logging.info("✅ Extraction successful with Python tarfile")
         except Exception as e:
-            logging.error(f"❌ Extraction failed: {e}")
+            logging.error(f"❌ Python tarfile failed: {e}")
+            # Method 2: System tar command
+            try:
+                logging.info("🔄 Trying system tar command...")
+                result = os.system(f'tar -xzf "{PROFILE_BACKUP}" -C "{PROFILE_PATH}"')
+                if result == 0:
+                    logging.info("✅ Extraction successful with system tar")
+                else:
+                    raise Exception("System tar command failed")
+            except Exception as e2:
+                logging.error(f"❌ System tar failed: {e2}")
+                # Method 3: Force extraction ignoring errors
+                try:
+                    logging.info("🔄 Trying forced extraction...")
+                    result = os.system(f'tar -xzf "{PROFILE_BACKUP}" -C "{PROFILE_PATH}" --force-local')
+                    if result == 0:
+                        logging.info("✅ Extraction successful with force")
+                    else:
+                        return None
+                except Exception as e3:
+                    logging.error(f"❌ All extraction methods failed: {e3}")
+                    return None
+        
+        # Check extraction result
+        extracted_items = os.listdir(PROFILE_PATH)
+        logging.info(f"📁 Extracted items: {extracted_items}")
+        
+        if not extracted_items:
+            logging.error("❌ No files extracted")
             return None
+            
+        # Find profile directory
+        profile_dir = None
+        for item in extracted_items:
+            item_path = os.path.join(PROFILE_PATH, item)
+            if os.path.isdir(item_path):
+                profile_dir = item_path
+                break
+        
+        if not profile_dir:
+            profile_dir = PROFILE_PATH
+        
+        logging.info(f"✅ Profile ready at: {profile_dir}")
+        return profile_dir
 
     def setup_browser_with_profile(self, profile_dir):
         """Setup Firefox with minimal profile"""
