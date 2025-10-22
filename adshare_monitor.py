@@ -2,7 +2,6 @@ import os
 import time
 import requests
 import tarfile
-import gdown
 from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.common.by import By
@@ -18,15 +17,7 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "8332116388:AAGbWaVQic0g7m5DU1USSXg
 EMAIL = os.getenv("ADSHARE_EMAIL", "loginallapps@gmail.com")
 PASSWORD = os.getenv("ADSHARE_PASSWORD", "@Sd2007123")
 
-# Google Drive URLs for Firefox profile
-PROFILE_URLS = [
-
-"https://drive.google.com/file/d/1YCVLQPRl90oVQmWgS9GxnPUFmE-WeUd_/view?usp=drivesdk",
-    "https://drive.google.com/uc?id=14FV2eLutUpJ9TdUrhLEvLFflRvAdCIG",
-    "https://drive.google.com/file/d/1XRb3wnpH8qq4BX06IhqRtvAaU5NI7H-2/view?usp=drivesdk",
-    "https://drive.google.com/file/d/1uxjgJ3wVMh5JTnHBd8r6MnXgixLufraM/view?usp=drivesdk"
-]
-
+# File paths
 PROFILE_BACKUP = "/tmp/firefox_profile.tar.gz"
 PROFILE_PATH = "/tmp/firefox_profile"
 
@@ -45,8 +36,8 @@ class AdShareMonitor:
         self.is_running = False
         
     def download_firefox_profile(self):
-        """Download Firefox profile from Google Drive"""
-        logging.info("📥 Downloading Firefox profile from Google Drive...")
+        """Download Firefox profile from MediaFire"""
+        logging.info("📥 Downloading Firefox profile from MediaFire...")
         
         # Clean up existing files
         if os.path.exists(PROFILE_BACKUP):
@@ -56,34 +47,35 @@ class AdShareMonitor:
             
         os.makedirs(PROFILE_PATH, exist_ok=True)
         
-        for url in PROFILE_URLS:
-            try:
-                logging.info(f"🔄 Trying URL: {url}")
+        mediafire_url = "https://www.mediafire.com/file/h3az6elusatcy6n/firefox_profile_backup.tar_%25281%2529.gz/file?dkey=zncovue6ii5&r=1659"
+        
+        try:
+            # Method 1: Use wget (most reliable)
+            logging.info("🔄 Downloading with wget...")
+            result = os.system(f'wget -O "{PROFILE_BACKUP}" "{mediafire_url}" --timeout=60 --tries=3')
+            
+            if result == 0 and os.path.exists(PROFILE_BACKUP) and os.path.getsize(PROFILE_BACKUP) > 1000000:
+                file_size = os.path.getsize(PROFILE_BACKUP)
+                logging.info(f"✅ Profile downloaded via wget: {file_size} bytes")
+                return True
+            
+            # Method 2: Use requests as fallback
+            logging.info("🔄 Trying with requests...")
+            response = requests.get(mediafire_url, stream=True, timeout=60)
+            response.raise_for_status()
+            
+            with open(PROFILE_BACKUP, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+            
+            if os.path.exists(PROFILE_BACKUP) and os.path.getsize(PROFILE_BACKUP) > 1000000:
+                file_size = os.path.getsize(PROFILE_BACKUP)
+                logging.info(f"✅ Profile downloaded via requests: {file_size} bytes")
+                return True
                 
-                # Extract file ID from URL
-                file_id = None
-                if '/uc?id=' in url:
-                    file_id = url.split('/uc?id=')[1]
-                elif '/file/d/' in url:
-                    file_id = url.split('/file/d/')[1].split('/')[0]
-                elif '/id=' in url:
-                    file_id = url.split('/id=')[1]
-                
-                if file_id:
-                    download_url = f'https://drive.google.com/uc?id={file_id}'
-                    logging.info(f"📦 Downloading profile with file ID: {file_id}")
-                    
-                    gdown.download(download_url, PROFILE_BACKUP, quiet=False)
-                    
-                    if os.path.exists(PROFILE_BACKUP) and os.path.getsize(PROFILE_BACKUP) > 1000000:
-                        file_size = os.path.getsize(PROFILE_BACKUP)
-                        logging.info(f"✅ Profile downloaded: {file_size} bytes")
-                        return True
-                        
-            except Exception as e:
-                logging.error(f"❌ Download failed: {e}")
-                continue
-                
+        except Exception as e:
+            logging.error(f"❌ Download failed: {e}")
+        
         logging.error("❌ All download attempts failed")
         return False
 
