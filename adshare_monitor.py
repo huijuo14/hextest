@@ -2,7 +2,6 @@ import os
 import time
 import requests
 import tarfile
-import zipfile
 from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.common.by import By
@@ -18,9 +17,10 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "8332116388:AAGbWaVQic0g7m5DU1USSXg
 EMAIL = os.getenv("ADSHARE_EMAIL", "loginallapps@gmail.com")
 PASSWORD = os.getenv("ADSHARE_PASSWORD", "@Sd2007123")
 
-# File paths - NOW USING ZIP
-PROFILE_BACKUP = "/tmp/firefox_profile.zip"
+# File paths - USING YOUR GITHUB TAR.GZ
+PROFILE_BACKUP = "/tmp/firefox_profile.tar.gz"
 PROFILE_PATH = "/tmp/firefox_profile"
+PROFILE_URL = "https://github.com/huijuo14/hextest/releases/download/v1.0/firefox_minimal.tar.gz"
 
 # Setup logging
 logging.basicConfig(
@@ -38,7 +38,7 @@ class AdShareMonitor:
         
     def download_firefox_profile(self):
         """Download Firefox profile from GitHub"""
-        logging.info("📥 Downloading Firefox profile ZIP...")
+        logging.info("📥 Downloading minimal Firefox profile...")
         
         # Clean up existing files
         if os.path.exists(PROFILE_BACKUP):
@@ -48,32 +48,28 @@ class AdShareMonitor:
             
         os.makedirs(PROFILE_PATH, exist_ok=True)
         
-        # Use your GitHub direct download URL
-        profile_url = "https://github.com/huijuo14/hextest/releases/download/v1.0/firefox_profile_essential.zip"
-        
         try:
-            logging.info("🔄 Downloading ZIP profile...")
-            result = os.system(f'wget -O "{PROFILE_BACKUP}" "{profile_url}" --timeout=60 --tries=3')
+            logging.info("🔄 Downloading from GitHub...")
+            result = os.system(f'wget -O "{PROFILE_BACKUP}" "{PROFILE_URL}" --timeout=60 --tries=3')
             
             if result == 0 and os.path.exists(PROFILE_BACKUP) and os.path.getsize(PROFILE_BACKUP) > 10000:
                 file_size = os.path.getsize(PROFILE_BACKUP)
-                logging.info(f"✅ ZIP Profile downloaded: {file_size} bytes")
+                logging.info(f"✅ Profile downloaded: {file_size} bytes")
                 return True
                 
         except Exception as e:
             logging.error(f"❌ Download failed: {e}")
         
-        logging.error("❌ ZIP Download failed")
+        logging.error("❌ Download failed")
         return False
 
     def extract_profile(self):
-        """Extract the Firefox profile from ZIP"""
+        """Extract the Firefox profile from TAR.GZ"""
         try:
-            logging.info("📦 Extracting Firefox profile from ZIP...")
+            logging.info("📦 Extracting Firefox profile...")
             
-            # Extract ZIP file
-            with zipfile.ZipFile(PROFILE_BACKUP, 'r') as zip_ref:
-                zip_ref.extractall(PROFILE_PATH)
+            with tarfile.open(PROFILE_BACKUP, 'r:gz') as tar:
+                tar.extractall(PROFILE_PATH)
             
             extracted_items = os.listdir(PROFILE_PATH)
             logging.info(f"📁 Extracted items: {extracted_items}")
@@ -98,13 +94,13 @@ class AdShareMonitor:
                 return None
                 
         except Exception as e:
-            logging.error(f"❌ ZIP Extraction failed: {e}")
+            logging.error(f"❌ Extraction failed: {e}")
             return None
 
-    def setup_browser_with_profile_optimized(self, profile_dir):
-        """Setup Firefox with profile - MEMORY OPTIMIZED but KEEP EXTENSIONS"""
+    def setup_browser_with_profile(self, profile_dir):
+        """Setup Firefox with minimal profile"""
         try:
-            logging.info("🦊 Setting up Firefox with profile (with extensions)...")
+            logging.info("🦊 Setting up Firefox with minimal profile...")
             
             # Set up virtual display
             os.system('Xvfb :99 -screen 0 800x600x16 &')
@@ -117,38 +113,29 @@ class AdShareMonitor:
             options.add_argument("--disable-gpu")
             options.add_argument("--window-size=800,600")
             
-            # MEMORY OPTIMIZATIONS BUT KEEP EXTENSIONS
+            # Memory optimizations
             options.set_preference("browser.startup.homepage", "about:blank")
             options.set_preference("browser.startup.page", 0)
             options.set_preference("dom.ipc.processCount", 1)
-            options.set_preference("dom.ipc.processCount.webIsolated", 1)
             options.set_preference("browser.tabs.remote.autostart", False)
             
-            # KEEP EXTENSIONS ENABLED
+            # Keep extensions enabled
             options.set_preference("extensions.autoDisableScopes", 0)
-            options.set_preference("extensions.enabledScopes", 15)
             
-            # Memory limits but keep functionality
-            options.set_preference("javascript.options.mem.max", 51200)
-            options.set_preference("browser.sessionstore.interval", 300000)
-            
-            # Disable cache but keep sessions
+            # Disable cache
             options.set_preference("browser.cache.disk.enable", False)
             options.set_preference("browser.cache.memory.enable", False)
-            options.set_preference("network.http.use-cache", False)
             
-            # Use the profile (EXTENSIONS WILL BE ENABLED)
+            # Use the profile
             options.add_argument(f"-profile")
             options.add_argument(profile_dir)
             
             # Start browser
             self.browser = webdriver.Firefox(options=options)
-            
-            # Timeouts
             self.browser.set_page_load_timeout(45)
             self.browser.implicitly_wait(15)
             
-            logging.info("✅ Firefox started with extensions enabled!")
+            logging.info("✅ Firefox started with minimal profile!")
             return True
             
         except Exception as e:
@@ -158,7 +145,7 @@ class AdShareMonitor:
     def check_login_status(self):
         """Check if we're logged in using the profile"""
         try:
-            logging.info("🌐 Checking login status with profile...")
+            logging.info("🌐 Checking login status...")
             
             self.browser.get("https://adsha.re/surf")
             time.sleep(10)
@@ -224,8 +211,8 @@ class AdShareMonitor:
             logging.error(f"❌ Login failed: {e}")
             return False
 
-    def simple_monitor(self):
-        """Simple monitoring"""
+    def monitor_loop(self):
+        """Main monitoring loop"""
         logging.info("🎯 Starting monitoring...")
         self.is_running = True
         iteration = 0
@@ -291,7 +278,7 @@ if __name__ == "__main__":
             logging.error("❌ Failed to extract profile")
             exit(1)
         
-        if not monitor.setup_browser_with_profile_optimized(profile_dir):
+        if not monitor.setup_browser_with_profile(profile_dir):
             logging.error("❌ Failed to setup browser")
             exit(1)
         
@@ -301,7 +288,7 @@ if __name__ == "__main__":
             exit(1)
         
         logging.info("✅ All systems go! Starting monitoring...")
-        monitor.simple_monitor()
+        monitor.monitor_loop()
         
     except Exception as e:
         logging.error(f"💥 Main execution failed: {e}")
