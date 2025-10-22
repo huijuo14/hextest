@@ -15,9 +15,6 @@ RUN wget https://github.com/mozilla/geckodriver/releases/download/v0.36.0/geckod
     && mv geckodriver /usr/local/bin/ \
     && rm geckodriver-v0.36.0-linux64.tar.gz
 
-# Install gdown for Google Drive downloads
-RUN pip install gdown
-
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
