@@ -20,7 +20,7 @@ import psutil
 EMAIL = "loginallapps@gmail.com"
 PASSWORD = "@Sd2007123"
 PROFILE_PATH = "/app/firefox_profile"
-PROFILE_URL = "https://github.com/huijuo14/hextest/releases/download/v1.0/firefox_profile.tar.gz"
+PROFILE_URL = "https://github.com/huijuo14/hextest/releases/download/v1.0/firefox_profile.tar.1.gz"
 
 app = Flask(__name__)
 
