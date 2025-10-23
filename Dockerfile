@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean
 
 # Install CORRECT geckodriver version for Firefox ESR
-RUN wget -q https://github.com/mozilla/geckodriver/releases/download/v0.34.0/geckodriver-v0.34.0-linux64.tar.gz \
+RUN wget -q https://github.com/mozilla/geckodriver/releases/download/v0.36.0/geckodriver-v0.36.0-linux64.tar.gz \
     && tar -xf geckodriver*.tar.gz -C /usr/local/bin/ \
     && rm geckodriver*.tar.gz \
     && chmod +x /usr/local/bin/geckodriver
