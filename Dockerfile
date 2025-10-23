@@ -4,12 +4,11 @@ FROM python:3.9-slim
 RUN apt-get update && apt-get install -y \
     firefox-esr \
     wget \
-    xvfb \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
-# Install specific geckodriver version
-RUN wget -q https://github.com/mozilla/geckodriver/releases/download/v0.30.0/geckodriver-v0.30.0-linux64.tar.gz \
+# Install CORRECT geckodriver version for Firefox ESR
+RUN wget -q https://github.com/mozilla/geckodriver/releases/download/v0.34.0/geckodriver-v0.34.0-linux64.tar.gz \
     && tar -xf geckodriver*.tar.gz -C /usr/local/bin/ \
     && rm geckodriver*.tar.gz \
     && chmod +x /usr/local/bin/geckodriver
