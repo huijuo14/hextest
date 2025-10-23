@@ -1,8 +1,9 @@
 FROM python:3.9-slim
 
-# Install Firefox with ALL dependencies
+# Install Firefox with ALL dependencies + wget
 RUN apt-get update && apt-get install -y \
     firefox-esr \
+    wget \
     libgtk-3-0 \
     libdbus-glib-1-2 \
     libxt6 \
@@ -16,7 +17,6 @@ RUN apt-get update && apt-get install -y \
     libpango-1.0-0 \
     libcairo2 \
     libasound2 \
-    strace \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
