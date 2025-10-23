@@ -22,5 +22,4 @@ COPY . .
 # Create profile directory
 RUN mkdir -p /app/firefox_profile
 
-EXPOSE 8000
-CMD ["python", "app.py"]
+CMD ["python", "worker.py"]
