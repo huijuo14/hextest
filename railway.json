@@ -3,7 +3,7 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "python debug_worker.py",
+    "startCommand": "python worker.py",
     "restartPolicyType": "ON_FAILURE"
   }
 }
