@@ -22,7 +22,7 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean
 
 # Install COMPATIBLE geckodriver version
-RUN wget -q https://github.com/mozilla/geckodriver/releases/download/v0.32.2/geckodriver-v0.32.2-linux64.tar.gz \
+RUN wget -q https://github.com/mozilla/geckodriver/releases/download/v0.36.2/geckodriver-v0.36.2-linux64.tar.gz \
     && tar -xf geckodriver*.tar.gz -C /usr/local/bin/ \
     && rm geckodriver*.tar.gz \
     && chmod +x /usr/local/bin/geckodriver
