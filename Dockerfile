@@ -1,6 +1,6 @@
 FROM python:3.9-slim
 
-# Install Firefox with ALL required libraries
+# Install Firefox with ALL dependencies
 RUN apt-get update && apt-get install -y \
     firefox-esr \
     libgtk-3-0 \
@@ -16,10 +16,11 @@ RUN apt-get update && apt-get install -y \
     libpango-1.0-0 \
     libcairo2 \
     libasound2 \
+    strace \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
-# Install matching geckodriver
+# Install geckodriver v0.36.0
 RUN wget -q https://github.com/mozilla/geckodriver/releases/download/v0.36.0/geckodriver-v0.36.0-linux64.tar.gz \
     && tar -xf geckodriver*.tar.gz -C /usr/local/bin/ \
     && rm geckodriver*.tar.gz \
@@ -35,4 +36,4 @@ COPY . .
 RUN mkdir -p /app/firefox_profile
 
 EXPOSE 5000
-CMD ["gunicorn", "--config", "gunicorn_config.py", "app:app"]
+CMD ["python", "app.py"]
