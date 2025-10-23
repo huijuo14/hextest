@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Fixed AdShare Monitor with Profile Restoration
+DEBUG AdShare Monitor - Full logging to find crash reason
 """
 
 import os
@@ -9,6 +9,7 @@ import logging
 import threading
 import tarfile
 import requests
+import subprocess
 from flask import Flask, jsonify
 from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
@@ -24,7 +25,7 @@ PROFILE_URL = "https://github.com/huijuo14/hextest/releases/download/v1.0/firefo
 
 app = Flask(__name__)
 
-class KoyebAdShareMonitor:
+class DebugAdShareMonitor:
     def __init__(self):
         self.browser = None
         self.monitoring = False
@@ -32,39 +33,79 @@ class KoyebAdShareMonitor:
         self.status = "Initializing"
         self.start_time = time.time()
         
-        # Setup logging
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+        # Setup DEBUG logging
+        logging.basicConfig(
+            level=logging.DEBUG,
+            format='%(asctime)s - %(levelname)s - %(message)s',
+            handlers=[
+                logging.StreamHandler(),
+                logging.FileHandler('/app/debug.log')
+            ]
+        )
         self.logger = logging.getLogger(__name__)
 
+    def debug_system_info(self):
+        """Debug system information"""
+        self.logger.debug("=== SYSTEM DEBUG INFO ===")
+        
+        # Check Firefox
+        try:
+            firefox_version = subprocess.check_output(['firefox', '--version'], stderr=subprocess.STDOUT)
+            self.logger.debug(f"Firefox: {firefox_version.decode().strip()}")
+        except Exception as e:
+            self.logger.debug(f"Firefox check failed: {e}")
+        
+        # Check geckodriver
+        try:
+            gecko_version = subprocess.check_output(['geckodriver', '--version'], stderr=subprocess.STDOUT)
+            self.logger.debug(f"Geckodriver: {gecko_version.decode().strip()}")
+        except Exception as e:
+            self.logger.debug(f"Geckodriver check failed: {e}")
+        
+        # Check memory
+        memory = psutil.virtual_memory()
+        self.logger.debug(f"Memory: {memory.available/1024/1024:.1f}MB available of {memory.total/1024/1024:.1f}MB total")
+        
+        # Check disk
+        disk = psutil.disk_usage('/')
+        self.logger.debug(f"Disk: {disk.free/1024/1024/1024:.1f}GB free")
+
     def download_profile(self):
-        """Download and extract profile with error handling"""
+        """Download and extract profile"""
         self.logger.info("📥 Downloading Firefox profile...")
         
         try:
-            # Download profile
+            # Clear existing
+            if os.path.exists(PROFILE_PATH):
+                import shutil
+                shutil.rmtree(PROFILE_PATH)
+            os.makedirs(PROFILE_PATH, exist_ok=True)
+            
+            # Download
             response = requests.get(PROFILE_URL, timeout=60, stream=True)
             response.raise_for_status()
             
-            # Save compressed profile
             temp_path = "/app/profile_temp.tar.gz"
             with open(temp_path, 'wb') as f:
                 for chunk in response.iter_content(chunk_size=8192):
                     f.write(chunk)
             
-            # Clear existing profile
-            if os.path.exists(PROFILE_PATH):
-                import shutil
-                shutil.rmtree(PROFILE_PATH)
+            self.logger.debug(f"Downloaded: {os.path.getsize(temp_path)} bytes")
             
-            os.makedirs(PROFILE_PATH, exist_ok=True)
-            
-            # Extract profile
+            # Extract
             with tarfile.open(temp_path, 'r:gz') as tar:
                 tar.extractall(PROFILE_PATH)
             
-            # Cleanup
-            os.remove(temp_path)
+            # List extracted files
+            extracted_files = []
+            for root, dirs, files in os.walk(PROFILE_PATH):
+                for file in files:
+                    extracted_files.append(os.path.relpath(os.path.join(root, file), PROFILE_PATH))
             
+            self.logger.debug(f"Extracted {len(extracted_files)} files")
+            self.logger.debug(f"Sample files: {extracted_files[:10]}")
+            
+            os.remove(temp_path)
             self.logger.info("✅ Profile downloaded successfully")
             return True
             
@@ -72,353 +113,199 @@ class KoyebAdShareMonitor:
             self.logger.error(f"❌ Profile download failed: {e}")
             return False
 
-    def setup_browser(self):
-        """Setup Firefox with profile and memory optimization"""
-        self.logger.info("🦊 Setting up Firefox browser...")
+    def setup_browser_with_debug(self):
+        """Setup browser with maximum debug info"""
+        self.logger.info("🦊 Setting up Firefox with DEBUG...")
         
         # Download profile first
         if not self.download_profile():
-            self.logger.warning("⚠️ Using fresh profile")
+            self.logger.warning("⚠️ Continuing without profile")
+            return False
         
         options = Options()
         options.headless = True
         
-        # ULTRA MEMORY OPTIMIZATION
-        memory_prefs = {
-            # Disable caches
+        # DEBUG preferences - enable all logging
+        debug_prefs = {
+            # Enable all logging
+            "browser.dom.window.dump.enabled": True,
+            "devtools.console.stdout.content": True,
+            "devtools.debugger.remote-enabled": True,
+            "devtools.chrome.enabled": True,
+            
+            # Memory limits
             "browser.cache.disk.enable": False,
             "browser.cache.memory.enable": False,
-            "browser.cache.offline.enable": False,
-            
-            # Single process
             "dom.ipc.processCount": 1,
             "browser.tabs.remote.autostart": False,
+            "javascript.options.mem.max": 80000000,
             
-            # JS memory limits
-            "javascript.options.mem.max": 80000000,  # 80MB
-            "javascript.options.gc_mem_threshold": 1,
-            
-            # Disable features
-            "media.memory_cache_max_size": 0,
-            "media.cache_size": 0,
-            "image.cache.size": 0,
-            
-            # Extensions
+            # Keep extensions
             "extensions.autoDisableScopes": 0,
-            "extensions.enabledScopes": 15,
-            
-            # Updates & telemetry
-            "app.update.auto": False,
-            "datareporting.healthreport.uploadEnabled": False,
-            "toolkit.telemetry.enabled": False,
-            
-            # Session
-            "browser.sessionstore.interval": 300000,
         }
         
-        for pref, value in memory_prefs.items():
+        for pref, value in debug_prefs.items():
             options.set_preference(pref, value)
+        
+        # Add debug arguments
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--verbose")
+        options.add_argument("--log-level=0")  # Maximum logging
         
         # Use profile
         options.add_argument(f"-profile")
         options.add_argument(PROFILE_PATH)
         
-        # Browser arguments
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--disable-gpu")
-        
-        # Service configuration
+        # Service with debug logging
         service = Service(
-            log_path=os.devnull,
-            service_args=['--log', 'fatal']
+            log_path="/app/geckodriver.log",
+            service_args=['--log', 'debug']
         )
         
         try:
-            self.logger.info("🚀 Starting Firefox with profile...")
+            self.logger.debug("🚀 Starting Firefox process...")
+            
+            # Start browser with timeout
+            import signal
+            
+            def timeout_handler(signum, frame):
+                raise TimeoutError("Browser startup timeout")
+            
+            # Set timeout
+            signal.signal(signal.SIGALRM, timeout_handler)
+            signal.alarm(30)  # 30 second timeout
+            
             self.browser = webdriver.Firefox(
                 options=options,
                 service=service
             )
             
-            # Small window
-            self.browser.set_window_size(1024, 768)
+            # Cancel timeout
+            signal.alarm(0)
             
-            self.logger.info("✅ Firefox started with profile!")
-            self.log_memory_usage()
+            self.logger.info("✅ Firefox started successfully!")
+            
+            # Test browser functionality
+            self.browser.get("about:blank")
+            self.logger.debug("✅ Browser basic functionality test passed")
+            
             return True
             
+        except TimeoutError:
+            self.logger.error("❌ Browser startup timeout")
+            return False
         except Exception as e:
             self.logger.error(f"❌ Browser setup failed: {e}")
-            # Try without profile as fallback
-            return self.setup_browser_fallback()
-
-    def setup_browser_fallback(self):
-        """Fallback browser setup without profile"""
-        self.logger.info("🔄 Trying fallback browser setup...")
-        
-        options = Options()
-        options.headless = True
-        
-        # Minimal preferences for fallback
-        options.set_preference("dom.ipc.processCount", 1)
-        options.set_preference("browser.tabs.remote.autostart", False)
-        options.set_preference("javascript.options.mem.max", 50000000)
-        
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        
-        try:
-            self.browser = webdriver.Firefox(options=options)
-            self.logger.info("✅ Fallback browser started")
-            return True
-        except Exception as e:
-            self.logger.error(f"❌ Fallback also failed: {e}")
+            self.logger.debug(f"Exception type: {type(e)}")
+            self.logger.debug(f"Exception args: {e.args}")
+            
+            # Try to get more info from geckodriver log
+            if os.path.exists("/app/geckodriver.log"):
+                with open("/app/geckodriver.log", "r") as f:
+                    gecko_log = f.read()
+                    self.logger.debug(f"Geckodriver log: {gecko_log[-1000:]}")  # Last 1000 chars
+            
             return False
 
-    def login_to_adshare(self):
-        """Simple login procedure"""
-        self.logger.info("🔐 Logging into AdShare...")
+    def test_browser_manually(self):
+        """Test browser startup manually to see exact error"""
+        self.logger.info("🔧 Testing browser manually...")
         
         try:
-            self.browser.get("https://adsha.re/surf")
-            time.sleep(10)
+            # Test Firefox directly
+            result = subprocess.run(
+                ['firefox', '--headless', '--version'],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            self.logger.debug(f"Firefox test stdout: {result.stdout}")
+            self.logger.debug(f"Firefox test stderr: {result.stderr}")
             
-            current_url = self.browser.current_url
-            self.logger.info(f"📍 Current URL: {current_url}")
+            # Test with profile
+            result = subprocess.run([
+                'firefox', 
+                '--headless',
+                '-profile', PROFILE_PATH,
+                '--screenshot', '/app/test.png',
+                'about:blank'
+            ], capture_output=True, text=True, timeout=30)
             
-            # Check if login needed
-            if "login" in current_url:
-                self.logger.info("📧 Entering credentials...")
-                
-                # Try multiple field selectors
-                selectors = [
-                    "input[name='mail']",
-                    "input[type='email']",
-                    "input[placeholder*='email' i]",
-                    "input[id*='mail']"
-                ]
-                
-                email_field = None
-                for selector in selectors:
-                    try:
-                        email_field = self.browser.find_element(By.CSS_SELECTOR, selector)
-                        break
-                    except:
-                        continue
-                
-                if email_field:
-                    email_field.clear()
-                    email_field.send_keys(EMAIL)
-                    self.logger.info("✅ Email entered")
-                
-                # Password field
-                password_selectors = [
-                    "input[type='password']",
-                    "input[name='password']",
-                    "input[placeholder*='password' i]"
-                ]
-                
-                password_field = None
-                for selector in password_selectors:
-                    try:
-                        password_field = self.browser.find_element(By.CSS_SELECTOR, selector)
-                        break
-                    except:
-                        continue
-                
-                if password_field:
-                    password_field.clear()
-                    password_field.send_keys(PASSWORD)
-                    self.logger.info("✅ Password entered")
-                
-                # Login button
-                login_selectors = [
-                    "button[type='submit']",
-                    "input[type='submit']",
-                    "a.button[onclick*='submit']",
-                    "button:contains('Login')",
-                    "input[value*='Login' i]"
-                ]
-                
-                login_btn = None
-                for selector in login_selectors:
-                    try:
-                        if "contains" in selector:
-                            buttons = self.browser.find_elements(By.TAG_NAME, "button")
-                            for btn in buttons:
-                                if "login" in btn.text.lower():
-                                    login_btn = btn
-                                    break
-                        else:
-                            login_btn = self.browser.find_element(By.CSS_SELECTOR, selector)
-                        if login_btn:
-                            break
-                    except:
-                        continue
-                
-                if login_btn:
-                    login_btn.click()
-                    self.logger.info("✅ Login button clicked")
-                    time.sleep(10)
+            self.logger.debug(f"Firefox with profile stdout: {result.stdout}")
+            self.logger.debug(f"Firefox with profile stderr: {result.stderr}")
             
-            # Final check
-            current_url = self.browser.current_url
-            if "surf" in current_url:
-                self.logger.info("✅ Successfully on surf page!")
+            if result.returncode == 0:
+                self.logger.info("✅ Manual Firefox test PASSED")
                 return True
             else:
-                self.logger.warning(f"⚠️ May need manual intervention: {current_url}")
-                return True  # Continue anyway
+                self.logger.error(f"❌ Manual Firefox test FAILED: {result.stderr}")
+                return False
                 
         except Exception as e:
-            self.logger.error(f"❌ Login process error: {e}")
+            self.logger.error(f"❌ Manual test failed: {e}")
             return False
-
-    def extract_credits(self):
-        """Extract credit information"""
-        try:
-            page_source = self.browser.page_source
-            import re
-            
-            patterns = [
-                r'(\d{1,3}(?:,\d{3})*)\s*Credits',
-                r'Credits.*?(\d{1,3}(?:,\d{3})*)',
-                r'balance.*?(\d[\d,]*)',
-            ]
-            
-            for pattern in patterns:
-                matches = re.findall(pattern, page_source, re.IGNORECASE)
-                if matches:
-                    self.credits = f"{matches[0]} Credits"
-                    return True
-            
-            self.credits = "Not found"
-            return False
-            
-        except Exception as e:
-            self.credits = f"Error: {str(e)[:30]}"
-            return False
-
-    def keep_alive(self):
-        """Main monitoring loop"""
-        self.logger.info("🔄 Starting monitoring loop...")
-        self.monitoring = True
-        
-        check_count = 0
-        
-        while self.monitoring:
-            try:
-                # Refresh every 15 minutes
-                if check_count % 9 == 0:
-                    self.browser.refresh()
-                    time.sleep(5)
-                    
-                    if self.extract_credits():
-                        self.logger.info(f"💰 Credits: {self.credits}")
-                
-                check_count += 1
-                self.status = f"Monitoring - Credits: {self.credits}"
-                
-                # Log memory every 30 minutes
-                if check_count % 18 == 0:
-                    self.log_memory_usage()
-                
-                # Wait 100 seconds
-                for _ in range(10):
-                    if not self.monitoring:
-                        break
-                    time.sleep(10)
-                    
-            except Exception as e:
-                self.logger.error(f"❌ Monitoring error: {e}")
-                time.sleep(60)
 
     def start_monitoring(self):
-        """Start the monitoring service"""
-        self.logger.info("🚀 Starting AdShare monitor...")
+        """Start monitoring with full debug"""
+        self.logger.info("🚀 Starting DEBUG AdShare monitor...")
         
-        if not self.setup_browser():
+        # Debug system first
+        self.debug_system_info()
+        
+        # Test browser manually
+        if not self.test_browser_manually():
+            self.logger.error("❌ Manual browser test failed")
             return False
         
-        # Try login
-        login_success = self.login_to_adshare()
-        if not login_success:
-            self.logger.warning("⚠️ Login may have issues, continuing...")
+        # Try Selenium setup
+        if not self.setup_browser_with_debug():
+            self.logger.error("❌ Selenium browser setup failed")
+            return False
         
-        # Start monitoring thread
-        monitor_thread = threading.Thread(target=self.keep_alive)
-        monitor_thread.daemon = True
-        monitor_thread.start()
-        
-        self.status = "Monitoring active"
+        self.logger.info("✅ DEBUG setup completed successfully!")
         return True
 
-    def stop_monitoring(self):
-        """Stop monitoring"""
-        self.logger.info("🛑 Stopping monitor...")
-        self.monitoring = False
-        time.sleep(2)
-        
-        if self.browser:
-            try:
-                self.browser.quit()
-            except:
-                pass
-            self.browser = None
-        
-        self.status = "Stopped"
-
-    def log_memory_usage(self):
-        """Log memory usage"""
-        memory = psutil.virtual_memory()
-        self.logger.info(f"💾 Memory: {memory.percent}% used")
-
 # Global monitor instance
-monitor = KoyebAdShareMonitor()
+monitor = DebugAdShareMonitor()
 
 # ========== FLASK ROUTES ==========
 
 @app.route('/')
 def index():
     return jsonify({
-        "status": "AdShare Monitor",
+        "status": "DEBUG AdShare Monitor",
         "monitor_status": monitor.status,
-        "credits": monitor.credits,
-        "uptime_hours": f"{(time.time() - monitor.start_time)/3600:.1f}",
-        "memory_percent": psutil.virtual_memory().percent
+        "message": "Check /app/debug.log for detailed logs"
     })
 
 @app.route('/start')
 def start_monitor():
     if not monitor.monitoring:
         success = monitor.start_monitoring()
-        return jsonify({"status": "started" if success else "failed"})
+        return jsonify({
+            "status": "started" if success else "failed",
+            "logs": "Check /app/debug.log and /app/geckodriver.log"
+        })
     return jsonify({"status": "already_running"})
 
-@app.route('/stop')
-def stop_monitor():
-    monitor.stop_monitoring()
-    return jsonify({"status": "stopped"})
+@app.route('/debug/logs')
+def get_logs():
+    """Get recent logs"""
+    try:
+        with open('/app/debug.log', 'r') as f:
+            logs = f.read().split('\n')[-50:]  # Last 50 lines
+        return jsonify({"recent_logs": logs})
+    except:
+        return jsonify({"error": "No logs yet"})
 
 @app.route('/health')
 def health_check():
-    return jsonify({
-        "status": "healthy",
-        "monitoring": monitor.monitoring,
-        "memory_percent": psutil.virtual_memory().percent
-    })
-
-@app.route('/restart')
-def restart_monitor():
-    monitor.stop_monitoring()
-    time.sleep(5)
-    success = monitor.start_monitoring()
-    return jsonify({"status": "restarted" if success else "restart_failed"})
+    return jsonify({"status": "debug_mode"})
 
 # Auto-start
 def initialize():
-    time.sleep(10)
+    time.sleep(5)
     monitor.start_monitoring()
 
 init_thread = threading.Thread(target=initialize)
