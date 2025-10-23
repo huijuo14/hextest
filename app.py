@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FIXED AdShare Monitor - Simple Profile Extraction
+ULTIMATE FIX - Test Firefox directly first
 """
 
 import os
@@ -9,6 +9,7 @@ import logging
 import threading
 import tarfile
 import requests
+import subprocess
 from flask import Flask, jsonify
 from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
@@ -23,7 +24,7 @@ PROFILE_URL = "https://github.com/huijuo14/hextest/releases/download/v1.0/firefo
 
 app = Flask(__name__)
 
-class SimpleAdShareMonitor:
+class UltimateAdShareMonitor:
     def __init__(self):
         self.browser = None
         self.monitoring = False
@@ -34,240 +35,189 @@ class SimpleAdShareMonitor:
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
         self.logger = logging.getLogger(__name__)
 
-    def download_profile_simple(self):
-        """Simple profile download that just extracts everything"""
-        self.logger.info("📥 Downloading Firefox profile...")
+    def test_firefox_directly(self):
+        """Test Firefox directly to see the real error"""
+        self.logger.info("🔧 Testing Firefox directly...")
         
+        # First test Firefox without profile
         try:
-            # Clear existing
+            result = subprocess.run(
+                ['firefox', '--headless', '--screenshot', '/app/test1.png', 'about:blank'],
+                capture_output=True, text=True, timeout=30
+            )
+            self.logger.info(f"Firefox no-profile test: returncode={result.returncode}")
+            if result.stderr:
+                self.logger.info(f"Firefox stderr: {result.stderr[:500]}")
+        except Exception as e:
+            self.logger.error(f"Firefox no-profile test failed: {e}")
+        
+        # Now test with profile
+        try:
+            # Download profile first
             if os.path.exists(PROFILE_PATH):
                 import shutil
                 shutil.rmtree(PROFILE_PATH)
             os.makedirs(PROFILE_PATH, exist_ok=True)
             
-            # Download
             response = requests.get(PROFILE_URL, timeout=60, stream=True)
-            response.raise_for_status()
-            
-            temp_path = "/app/profile_temp.tar.gz"
-            with open(temp_path, 'wb') as f:
+            with open('/app/temp.tar.gz', 'wb') as f:
                 for chunk in response.iter_content(chunk_size=8192):
                     f.write(chunk)
             
-            # Extract directly to profile path, ignoring errors
-            with tarfile.open(temp_path, 'r:gz') as tar:
-                # Get all members
-                members = tar.getmembers()
-                for member in members:
-                    try:
-                        # Fix path - remove the nested directory structure
-                        if '5yvzi8ts.default-default' in member.name:
-                            # Extract files from the actual profile directory
-                            member.name = os.path.basename(member.name)
-                            tar.extract(member, PROFILE_PATH)
-                    except Exception as e:
-                        self.logger.debug(f"⚠️ Skipped {member.name}: {e}")
-                        continue
+            # Extract all files
+            with tarfile.open('/app/temp.tar.gz', 'r:gz') as tar:
+                tar.extractall(PROFILE_PATH)
             
-            os.remove(temp_path)
+            os.remove('/app/temp.tar.gz')
             
-            # Check if we have essential files
-            essential_files = ['prefs.js', 'extensions']
-            has_essentials = any(os.path.exists(os.path.join(PROFILE_PATH, f)) for f in essential_files)
+            # Test Firefox with profile
+            result = subprocess.run([
+                'firefox', '--headless',
+                '-profile', PROFILE_PATH,
+                '--screenshot', '/app/test2.png',
+                'about:blank'
+            ], capture_output=True, text=True, timeout=30)
             
-            if has_essentials:
-                self.logger.info("✅ Profile extracted successfully")
-                return True
-            else:
-                self.logger.warning("⚠️ Profile missing essential files")
-                return False
+            self.logger.info(f"Firefox with-profile test: returncode={result.returncode}")
+            if result.stdout:
+                self.logger.info(f"Firefox stdout: {result.stdout}")
+            if result.stderr:
+                self.logger.info(f"Firefox stderr: {result.stderr}")
                 
+            return result.returncode == 0
+            
         except Exception as e:
-            self.logger.error(f"❌ Profile download failed: {e}")
+            self.logger.error(f"Firefox with-profile test failed: {e}")
             return False
 
-    def setup_browser_simple(self):
-        """Simple browser setup that just works"""
-        self.logger.info("🦊 Setting up Firefox...")
+    def setup_browser_ultralight(self):
+        """ULTRA LIGHT browser setup"""
+        self.logger.info("🦊 Setting up ULTRA LIGHT Firefox...")
         
-        # Try to download profile, but continue if it fails
-        profile_loaded = self.download_profile_simple()
+        # Test Firefox first
+        firefox_works = self.test_firefox_directly()
+        if not firefox_works:
+            self.logger.error("❌ Firefox itself is broken")
+            return False
         
         options = Options()
         options.headless = True
         
-        # Minimal memory settings
-        options.set_preference("browser.cache.disk.enable", False)
-        options.set_preference("browser.cache.memory.enable", False)
+        # ULTRA MINIMAL preferences
         options.set_preference("dom.ipc.processCount", 1)
-        options.set_preference("javascript.options.mem.max", 50000000)
+        options.set_preference("browser.tabs.remote.autostart", False)
+        options.set_preference("javascript.options.mem.max", 30000000)  # 30MB only!
         
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--disable-gpu")
         
-        # Use profile if we have one
-        if profile_loaded and os.path.exists(os.path.join(PROFILE_PATH, "prefs.js")):
-            options.add_argument(f"-profile")
-            options.add_argument(PROFILE_PATH)
-            self.logger.info("✅ Using Firefox profile with extensions")
-        else:
-            self.logger.info("ℹ️ Using fresh Firefox instance")
-        
+        # Try WITHOUT profile first
+        self.logger.info("🚀 Trying Firefox WITHOUT profile...")
         try:
             self.browser = webdriver.Firefox(options=options)
-            self.logger.info("✅ Firefox started successfully!")
+            self.logger.info("✅ Firefox started WITHOUT profile!")
             return True
-            
         except Exception as e:
-            self.logger.error(f"❌ Browser setup failed: {e}")
-            return False
-
-    def navigate_to_surf(self):
-        """Simply navigate to surf page"""
-        self.logger.info("🌐 Navigating to AdShare...")
+            self.logger.error(f"❌ Browser without profile failed: {e}")
         
+        # If that fails, try with profile but with even more restrictions
+        self.logger.info("🚀 Trying Firefox WITH profile...")
         try:
+            options.add_argument(f"-profile")
+            options.add_argument(PROFILE_PATH)
+            
+            # Add more restrictions for profile
+            options.set_preference("extensions.autoDisableScopes", 10)  # Disable most extensions
+            
+            self.browser = webdriver.Firefox(options=options)
+            self.logger.info("✅ Firefox started WITH profile!")
+            return True
+        except Exception as e:
+            self.logger.error(f"❌ Browser with profile failed: {e}")
+        
+        return False
+
+    def simple_navigation(self):
+        """Simple navigation to surf page"""
+        try:
+            self.logger.info("🌐 Navigating to AdShare...")
             self.browser.get("https://adsha.re/surf")
-            time.sleep(10)
+            time.sleep(15)  # Longer wait
             
             current_url = self.browser.current_url
             self.logger.info(f"📍 Current URL: {current_url}")
             
-            # Check if we need to login
+            # If login page, try basic login
             if "login" in current_url:
-                self.logger.info("🔐 Attempting login...")
-                return self.attempt_login()
-            else:
-                self.logger.info("✅ Already on surf page!")
-                return True
+                self.logger.info("🔐 Attempting simple login...")
                 
+                # Just try the most common selectors
+                try:
+                    email = self.browser.find_element(By.CSS_SELECTOR, "input[name='mail']")
+                    email.send_keys(EMAIL)
+                except: pass
+                
+                try:
+                    password = self.browser.find_element(By.CSS_SELECTOR, "input[type='password']")
+                    password.send_keys(PASSWORD)
+                except: pass
+                
+                try:
+                    login = self.browser.find_element(By.CSS_SELECTOR, "button[type='submit']")
+                    login.click()
+                except: pass
+                
+                time.sleep(10)
+            
+            return True
+            
         except Exception as e:
             self.logger.error(f"❌ Navigation failed: {e}")
             return False
 
-    def attempt_login(self):
-        """Simple login attempt"""
-        try:
-            # Try to find and fill email
-            email_selectors = ["input[name='mail']", "input[type='email']"]
-            for selector in email_selectors:
-                try:
-                    email_field = self.browser.find_element(By.CSS_SELECTOR, selector)
-                    email_field.clear()
-                    email_field.send_keys(EMAIL)
-                    self.logger.info("✅ Email entered")
-                    break
-                except:
-                    continue
-            
-            # Try to find and fill password
-            password_selectors = ["input[type='password']", "input[name='password']"]
-            for selector in password_selectors:
-                try:
-                    password_field = self.browser.find_element(By.CSS_SELECTOR, selector)
-                    password_field.clear()
-                    password_field.send_keys(PASSWORD)
-                    self.logger.info("✅ Password entered")
-                    break
-                except:
-                    continue
-            
-            # Try to find and click login button
-            login_selectors = [
-                "button[type='submit']", 
-                "input[type='submit']",
-                "a.button[onclick*='submit']"
-            ]
-            for selector in login_selectors:
-                try:
-                    login_btn = self.browser.find_element(By.CSS_SELECTOR, selector)
-                    login_btn.click()
-                    self.logger.info("✅ Login button clicked")
-                    break
-                except:
-                    continue
-            
-            time.sleep(10)
-            
-            # Check result
-            if "surf" in self.browser.current_url:
-                self.logger.info("✅ Login successful!")
-                return True
-            else:
-                self.logger.warning("⚠️ Login may have failed, but continuing...")
-                return True
-                
-        except Exception as e:
-            self.logger.error(f"❌ Login attempt failed: {e}")
-            return True  # Continue anyway
-
-    def check_credits(self):
-        """Check current credits"""
-        try:
-            import re
-            page_source = self.browser.page_source
-            
-            # Simple credit pattern matching
-            credit_match = re.search(r'(\d[\d,]*) Credits', page_source)
-            if credit_match:
-                self.credits = f"{credit_match.group(1)} Credits"
-                return True
-            else:
-                self.credits = "Not found"
-                return False
-                
-        except Exception as e:
-            self.credits = f"Error: {str(e)[:20]}"
-            return False
-
-    def monitor_loop(self):
-        """Main monitoring loop"""
-        self.logger.info("🔄 Starting monitoring loop...")
+    def monitor_simple(self):
+        """Simple monitoring"""
+        self.logger.info("🔄 Starting simple monitoring...")
         self.monitoring = True
-        
-        cycle_count = 0
         
         while self.monitoring:
             try:
-                # Refresh page every 10 minutes
-                if cycle_count % 6 == 0:  # 6 * 100s = 10 minutes
-                    self.browser.refresh()
-                    time.sleep(5)
+                # Just keep the page open, refresh every 20 minutes
+                self.browser.refresh()
+                time.sleep(5)
                 
-                # Check credits every 30 minutes
-                if cycle_count % 18 == 0:  # 18 * 100s = 30 minutes
-                    if self.check_credits():
+                # Simple credit check
+                page_source = self.browser.page_source
+                if "Credits" in page_source:
+                    import re
+                    match = re.search(r'(\d[\d,]*) Credits', page_source)
+                    if match:
+                        self.credits = f"{match.group(1)} Credits"
                         self.logger.info(f"💰 Credits: {self.credits}")
-                    else:
-                        self.logger.info("🔍 Checking page status...")
                 
-                cycle_count += 1
-                self.status = f"Active - Credits: {self.credits}"
+                self.status = f"Monitoring - {self.credits}"
                 
-                # Wait 100 seconds
-                for i in range(10):
+                # Wait 20 minutes
+                for _ in range(120):  # 120 * 10s = 20 minutes
                     if not self.monitoring:
                         break
                     time.sleep(10)
                     
             except Exception as e:
                 self.logger.error(f"❌ Monitoring error: {e}")
-                time.sleep(60)  # Wait 1 minute before retry
+                time.sleep(60)
 
     def start_monitoring(self):
-        """Start the monitor"""
-        self.logger.info("🚀 Starting AdShare monitor...")
+        """Start monitoring"""
+        self.logger.info("🚀 Starting Ultimate AdShare monitor...")
         
-        if not self.setup_browser_simple():
-            self.logger.error("❌ Failed to start browser")
+        if not self.setup_browser_ultralight():
             return False
         
-        # Navigate to surf page
-        if not self.navigate_to_surf():
-            self.logger.warning("⚠️ Navigation issues, but continuing...")
+        self.simple_navigation()
         
-        # Start monitoring thread
-        monitor_thread = threading.Thread(target=self.monitor_loop)
+        monitor_thread = threading.Thread(target=self.monitor_simple)
         monitor_thread.daemon = True
         monitor_thread.start()
         
@@ -275,7 +225,7 @@ class SimpleAdShareMonitor:
         return True
 
     def stop_monitoring(self):
-        """Stop the monitor"""
+        """Stop monitoring"""
         self.logger.info("🛑 Stopping monitor...")
         self.monitoring = False
         
@@ -287,16 +237,15 @@ class SimpleAdShareMonitor:
         
         self.status = "Stopped"
 
-# Global monitor instance
-monitor = SimpleAdShareMonitor()
+# Global monitor
+monitor = UltimateAdShareMonitor()
 
 @app.route('/')
 def index():
     return jsonify({
-        "status": "AdShare Monitor",
+        "status": "AdShare Monitor - ULTIMATE FIX",
         "monitor_status": monitor.status,
-        "credits": monitor.credits,
-        "uptime_hours": f"{(time.time() - monitor.start_time)/3600:.1f}"
+        "credits": monitor.credits
     })
 
 @app.route('/start')
@@ -306,27 +255,10 @@ def start_monitor():
         return jsonify({"status": "started" if success else "failed"})
     return jsonify({"status": "already_running"})
 
-@app.route('/stop')
-def stop_monitor():
-    monitor.stop_monitoring()
-    return jsonify({"status": "stopped"})
-
 @app.route('/health')
 def health_check():
-    return jsonify({
-        "status": "healthy", 
-        "monitoring": monitor.monitoring,
-        "memory_percent": psutil.virtual_memory().percent
-    })
+    return jsonify({"status": "healthy", "monitoring": monitor.monitoring})
 
-# Auto-start
-def initialize():
-    time.sleep(5)
-    monitor.start_monitoring()
-
-init_thread = threading.Thread(target=initialize)
-init_thread.daemon = True
-init_thread.start()
-
+# Don't auto-start - let user start manually
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)
