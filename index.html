@@ -2,30 +2,34 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>One moment…</title>
-  <style>body{margin:0;padding:40px;font-family:Arial;text-align:center;background:#fafafa;}</style>
+  <title>Connecting…</title>
+  <style>
+    body{margin:0;padding:40px;font-family:Arial;text-align:center;background:#fafafa;}
+  </style>
 </head>
 <body>
   <p>Connecting to YouTube…</p>
 
   <script>
-    // Step 1: Load YouTube video in a hidden iframe to set cookies
-    const ytUrl = 'https://www.youtube.com/watch?v=irTFKUX5bS4';
-    const finalUrl = 'https://www.rotate4all.com/ptp/promote-296612';
+    // ----- CONFIG -----
+    const YT_VIDEO   = 'https://www.youtube.com/watch?v=irTFKUX5bS4';
+    const REDIR_URL  = 'https://www.youtube.com/redirect?event=video_description&redir_token=QUFFLUhqbnk1WGs3bjlLbnM1SzZiRDJUVGhNbW9MMHREZ3xBQ3Jtc0tudlVscWQtcGtGZkZLakpucG9ieU1hS3B2T2YzWmMyYTQ4Zm54RFdfZV8tWmRSdW52Nk5BbUhkOVBya3p4NURmY3d5NnE4RVpCaXJqQTV5M2NscUUwN3dZMEJsc3czZXRZZ3RldXlJcjVtWHZWNVN3NA&q=https%3A%2F%2Fwww.rotate4all.com%2Fptp%2Fpromote-296612&v=irTFKUX5bS4';
+    // ------------------
 
+    // 1. Load YouTube video in a hidden iframe → sets cookies
     const iframe = document.createElement('iframe');
     iframe.style.display = 'none';
-    iframe.src = ytUrl;
+    iframe.src = YT_VIDEO;
     document.body.appendChild(iframe);
 
-    // Step 2: Wait ~1.5 sec for cookies, then redirect in same tab
+    // 2. After ~1.5 s (enough for cookies) go to the description redirect
     setTimeout(() => {
       // Spoof referrer so Rotate4All sees YouTube
       Object.defineProperty(document, 'referrer', {
-        get: () => ytUrl,
+        get: () => YT_VIDEO,
         configurable: false
       });
-      window.location.replace(finalUrl);
+      window.location.replace(REDIR_URL);
     }, 1500);
   </script>
 
