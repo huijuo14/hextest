@@ -2,25 +2,35 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Redirecting…</title>
-  
-  <!-- Force YouTube as the referrer (most browsers respect this) -->
-  <meta name="referrer" content="no-referrer-when-downgrade">
-  
-  <!-- Immediate same-tab redirect -->
-  <script>
-    // Spoof YouTube video as referrer
-    Object.defineProperty(document, 'referrer', {
-      get: () => 'https://www.youtube.com/watch?v=irTFKUX5bS4',
-      configurable: false
-    });
-
-    // Replace current page (same tab, no history)
-    window.location.replace('https://www.rotate4all.com/ptp/promote-296612');
-  </script>
+  <title>One moment…</title>
+  <style>body{margin:0;padding:40px;font-family:Arial;text-align:center;background:#fafafa;}</style>
 </head>
-<body style="margin:0; padding:40px; font-family:Arial; text-align:center; background:#f0f0f0;">
-  <p>Redirecting to <strong>Rotate4All</strong>…</p>
-  <p>If not redirected, <a href="https://www.rotate4all.com/ptp/promote-296612">click here</a>.</p>
+<body>
+  <p>Connecting to YouTube…</p>
+
+  <script>
+    // Step 1: Load YouTube video in a hidden iframe to set cookies
+    const ytUrl = 'https://www.youtube.com/watch?v=irTFKUX5bS4';
+    const finalUrl = 'https://www.rotate4all.com/ptp/promote-296612';
+
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    iframe.src = ytUrl;
+    document.body.appendChild(iframe);
+
+    // Step 2: Wait ~1.5 sec for cookies, then redirect in same tab
+    setTimeout(() => {
+      // Spoof referrer so Rotate4All sees YouTube
+      Object.defineProperty(document, 'referrer', {
+        get: () => ytUrl,
+        configurable: false
+      });
+      window.location.replace(finalUrl);
+    }, 1500);
+  </script>
+
+  <noscript>
+    <p><a href="https://www.rotate4all.com/ptp/promote-296612">Click here if not redirected</a></p>
+  </noscript>
 </body>
 </html>
