@@ -8,7 +8,7 @@
   </style>
 </head>
 <body>
-  <p>Connecting to YouTube…</p>
+  <p>Loading YouTube video…</p>
 
   <script>
     // ----- CONFIG -----
@@ -16,21 +16,31 @@
     const REDIR_URL  = 'https://www.youtube.com/redirect?event=video_description&redir_token=QUFFLUhqbnk1WGs3bjlLbnM1SzZiRDJUVGhNbW9MMHREZ3xBQ3Jtc0tudlVscWQtcGtGZkZLakpucG9ieU1hS3B2T2YzWmMyYTQ4Zm54RFdfZV8tWmRSdW52Nk5BbUhkOVBya3p4NURmY3d5NnE4RVpCaXJqQTV5M2NscUUwN3dZMEJsc3czZXRZZ3RldXlJcjVtWHZWNVN3NA&q=https%3A%2F%2Fwww.rotate4all.com%2Fptp%2Fpromote-296612&v=irTFKUX5bS4';
     // ------------------
 
-    // 1. Load YouTube video in a hidden iframe → sets cookies
+    // 1. Load YouTube video in hidden iframe
     const iframe = document.createElement('iframe');
     iframe.style.display = 'none';
     iframe.src = YT_VIDEO;
     document.body.appendChild(iframe);
 
-    // 2. After ~1.5 s (enough for cookies) go to the description redirect
+    // 2. Wait for iframe to fully load (cookies set)
+    iframe.onload = () => {
+      setTimeout(() => {
+        // Spoof referrer
+        Object.defineProperty(document, 'referrer', {
+          get: () => YT_VIDEO,
+          configurable: false
+        });
+        // Redirect in same tab
+        window.location.replace(REDIR_URL);
+      }, 300); // tiny buffer after load
+    };
+
+    // Fallback if iframe fails
     setTimeout(() => {
-      // Spoof referrer so Rotate4All sees YouTube
-      Object.defineProperty(document, 'referrer', {
-        get: () => YT_VIDEO,
-        configurable: false
-      });
-      window.location.replace(REDIR_URL);
-    }, 3500);
+      if (document.body.innerHTML.includes('Loading')) {
+        window.location.replace(REDIR_URL);
+      }
+    }, 5000);
   </script>
 
   <noscript>
