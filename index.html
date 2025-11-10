@@ -2,25 +2,25 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>One Sec... Redirecting to Promo</title>
-  <!-- Strict referrer policy to mimic YouTube -->
-  <meta http-equiv="Referrer-Policy" content="origin-when-cross-origin">
-  <!-- Fallback meta refresh for same-tab redirect -->
-  <meta http-equiv="refresh" content="0; url=https://www.rotate4all.com/ptp/promote-296612">
+  <title>Redirecting…</title>
+  
+  <!-- Force YouTube as the referrer (most browsers respect this) -->
+  <meta name="referrer" content="no-referrer-when-downgrade">
+  
+  <!-- Immediate same-tab redirect -->
   <script>
-    // Spoof YouTube referrer (sets document.referrer to exact video URL)
+    // Spoof YouTube video as referrer
     Object.defineProperty(document, 'referrer', {
-      get: function() { return 'https://www.youtube.com/watch?v=irTFKUX5bS4'; },
+      get: () => 'https://www.youtube.com/watch?v=irTFKUX5bS4',
       configurable: false
     });
-    
-    // Force same-tab replace (no history push, no popup trigger)
+
+    // Replace current page (same tab, no history)
     window.location.replace('https://www.rotate4all.com/ptp/promote-296612');
   </script>
-  <style> body { margin: 0; padding: 40px; text-align: center; font-family: Arial; } </style>
 </head>
-<body>
-  <p> Jumping to Rotate4All promo... If not auto, <a href="https://www.rotate4all.com/ptp/promote-296612" style="color: #ff0000;">tap here</a>.</p>
+<body style="margin:0; padding:40px; font-family:Arial; text-align:center; background:#f0f0f0;">
+  <p>Redirecting to <strong>Rotate4All</strong>…</p>
+  <p>If not redirected, <a href="https://www.rotate4all.com/ptp/promote-296612">click here</a>.</p>
 </body>
 </html>
