@@ -2,49 +2,44 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Connecting…</title>
+  <title>YouTube → Rotate4All</title>
   <style>
-    body{margin:0;padding:40px;font-family:Arial;text-align:center;background:#fafafa;}
+    body, html { margin:0; padding:0; height:100%; overflow:hidden; background:#000; }
+    iframe { width:100%; height:100%; border:none; }
+    .msg { position:absolute; top:10px; left:10px; color:#fff; font-family:Arial; background:rgba(0,0,0,0.6); padding:8px 12px; border-radius:4px; font-size:14px; }
   </style>
 </head>
 <body>
-  <p>Loading YouTube video…</p>
+  <div class="msg">Loading YouTube video… Please wait</div>
+  <iframe id="ytframe" src="https://www.youtube.com/embed/irTFKUX5bS4?autoplay=1&mute=1"></iframe>
 
   <script>
-    // ----- CONFIG -----
-    const YT_VIDEO   = 'https://www.youtube.com/watch?v=irTFKUX5bS4';
-    const REDIR_URL  = 'https://www.youtube.com/redirect?event=video_description&redir_token=QUFFLUhqbnk1WGs3bjlLbnM1SzZiRDJUVGhNbW9MMHREZ3xBQ3Jtc0tudlVscWQtcGtGZkZLakpucG9ieU1hS3B2T2YzWmMyYTQ4Zm54RFdfZV8tWmRSdW52Nk5BbUhkOVBya3p4NURmY3d5NnE4RVpCaXJqQTV5M2NscUUwN3dZMEJsc3czZXRZZ3RldXlJcjVtWHZWNVN3NA&q=https%3A%2F%2Fwww.rotate4all.com%2Fptp%2Fpromote-296612&v=irTFKUX5bS4';
-    // ------------------
+    const REDIR_URL = 'https://www.youtube.com/redirect?event=video_description&redir_token=QUFFLUhqbnk1WGs3bjlLbnM1SzZiRDJUVGhNbW9MMHREZ3xBQ3Jtc0tudlVscWQtcGtGZkZLakpucG9ieU1hS3B2T2YzWmMyYTQ4Zm54RFdfZV8tWmRSdW52Nk5BbUhkOVBya3p4NURmY3d5NnE4RVpCaXJqQTV5M2NscUUwN3dZMEJsc3czZXRZZ3RldXlJcjVtWHZWNVN3NA&q=https%3A%2F%2Fwww.rotate4all.com%2Fptp%2Fpromote-296612&v=irTFKUX5bS4';
 
-    // 1. Load YouTube video in hidden iframe
-    const iframe = document.createElement('iframe');
-    iframe.style.display = 'none';
-    iframe.src = YT_VIDEO;
-    document.body.appendChild(iframe);
+    const iframe = document.getElementById('ytframe');
+    const msg = document.querySelector('.msg');
 
-    // 2. Wait for iframe to fully load (cookies set)
     iframe.onload = () => {
+      msg.textContent = 'YouTube loaded! Redirecting to Rotate4All…';
+      
       setTimeout(() => {
         // Spoof referrer
         Object.defineProperty(document, 'referrer', {
-          get: () => YT_VIDEO,
+          get: () => 'https://www.youtube.com/watch?v=irTFKUX5bS4',
           configurable: false
         });
-        // Redirect in same tab
+        // Same-tab redirect
         window.location.replace(REDIR_URL);
-      }, 300); // tiny buffer after load
+      }, 800);
     };
 
-    // Fallback if iframe fails
+    // Fallback after 10 sec
     setTimeout(() => {
-      if (document.body.innerHTML.includes('Loading')) {
+      if (msg.textContent.includes('Loading')) {
+        msg.textContent = 'Taking too long? Going to Rotate4All…';
         window.location.replace(REDIR_URL);
       }
-    }, 5000);
+    }, 10000);
   </script>
-
-  <noscript>
-    <p><a href="https://www.rotate4all.com/ptp/promote-296612">Click here if not redirected</a></p>
-  </noscript>
 </body>
 </html>
