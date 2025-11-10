@@ -16,8 +16,9 @@
   </style>
 </head>
 <body>
-  <div class="overlay" id="msg">Loading full YouTube…</div>
-  <iframe id="ytframe" src="https://www.youtube.com/watch?v=irTFKUX5bS4"></iframe>
+  <div class="overlay" id="msg">Loading YouTube video…</div>
+  <!-- Official embed: Loads fully, sets cookies -->
+  <iframe id="ytframe" src="https://www.youtube.com/embed/irTFKUX5bS4?autoplay=1&mute=1&enablejsapi=1"></iframe>
 
   <script>
     const REDIR_URL = 'https://www.youtube.com/redirect?event=video_description&redir_token=QUFFLUhqbnk1WGs3bjlLbnM1SzZiRDJUVGhNbW9MMHREZ3xBQ3Jtc0tudlVscWQtcGtGZkZLakpucG9ieU1hS3B2T2YzWmMyYTQ4Zm54RFdfZV8tWmRSdW52Nk5BbUhkOVBya3p4NURmY3d5NnE4RVpCaXJqQTV5M2NscUUwN3dZMEJsc3czZXRZZ3RldXlJcjVtWHZWNVN3NA&q=https%3A%2F%2Fwww.rotate4all.com%2Fptp%2Fpromote-296612&v=irTFKUX5bS4';
@@ -36,16 +37,16 @@
         });
         // Same-tab redirect
         window.location.replace(REDIR_URL);
-      }, 1000); // 1 second after full load
+      }, 1000); // 1 sec after load
     };
 
-    // Fallback after 12 sec
+    // Fallback after 10 sec
     setTimeout(() => {
       if (msg.textContent.includes('Loading')) {
         msg.textContent = 'Going to promo…';
         window.location.replace(REDIR_URL);
       }
-    }, 12000);
+    }, 10000);
   </script>
 </body>
 </html>
